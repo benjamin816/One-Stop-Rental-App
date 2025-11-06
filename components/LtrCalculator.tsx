@@ -1,20 +1,27 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import { pmt, loanAmt, money } from '../utils/calculators';
-import type { LtrData } from '../App';
+import type { LtrData, CalculatorType } from '../App';
 
 interface LtrCalculatorProps {
     data: LtrData;
     onChange: (field: keyof LtrData, value: string) => void;
     onCheckboxChange: (field: keyof LtrData, checked: boolean) => void;
+    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
+    onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <h3 className="font-bold text-md mt-6 mb-2 border-b pb-1 col-span-1 md:col-span-2">{children}</h3>
 );
 
-const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckboxChange }) => {
+const calculatorNames: Record<CalculatorType, string> = {
+    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+};
+
+const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckboxChange, onPushData, onExportPdf }) => {
+    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
     const metrics = useMemo(() => {
         const purchaseLoan = loanAmt(data.purchase, data.downPct);
         const loan = data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan;
@@ -32,10 +39,40 @@ const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckbo
 
         return { loan, pi, piti, opex, cf, coc, ccPct, pmMonthly, maintMonthly, capexMonthly, cashIn, purchaseLoan };
     }, [data]);
+    
+    const CALCULATOR_ID = "ltr-calculator";
+    const ACTIONS_CLASS = "ltr-actions";
+    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'ltr');
+
+    const handlePushClick = (destination: CalculatorType) => {
+        onPushData('ltr', destination);
+        setIsPushMenuOpen(false);
+    };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-5">
+        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-extrabold tracking-wide text-lg mb-3">Long / Medium-Term Rental</h2>
+            
+            <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+                <div className="relative">
+                    <button onClick={() => setIsPushMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
+                        Send Data To...
+                    </button>
+                    {isPushMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+                            <ul className="py-1">
+                                {availableDestinations.map(key => (
+                                    <li key={key}><button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{calculatorNames[key]}</button></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+                <button onClick={() => onExportPdf(CALCULATOR_ID, 'LTR_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
+                    Export PDF
+                </button>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SectionHeader>The Purchase</SectionHeader>
                 <InputField label="Purchase Price" id="ltr_purchase" value={data.purchase} onChange={e => onChange('purchase', e.target.value)} min={50000} max={1500000} step={1000} />

@@ -2,13 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import { pmt, loanAmt, money } from '../utils/calculators';
-import type { DscrData } from '../App';
+import type { DscrData, CalculatorType } from '../App';
 
 interface DscrCalculatorProps {
     data: DscrData;
     onChange: (field: keyof DscrData, value: string | number) => void;
     onCheckboxChange: (field: keyof DscrData, checked: boolean) => void;
     onRadioChange: (field: keyof DscrData, value: 'LTR' | 'STR') => void;
+    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -25,8 +26,14 @@ const ReadOnlyField: React.FC<{ label: string; value: string | number, infoText?
     </div>
 );
 
-const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheckboxChange, onRadioChange }) => {
+const calculatorNames: Record<CalculatorType, string> = {
+    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+};
+
+const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheckboxChange, onRadioChange, onPushData }) => {
     const [activeSubTab, setActiveSubTab] = useState<'lender' | 'investor'>('lender');
+    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
     // Effect to set default stress values when property type changes
     useEffect(() => {
@@ -111,18 +118,106 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
     }, [data, lenderMetrics]);
     
     const dscrPass = lenderMetrics.dscr >= data.min_dscr;
+    
+    const CALCULATOR_ID = "dscr-calculator";
+    const ACTIONS_CLASS = "dscr-actions";
+    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'dscr');
+
+    const handlePushClick = (destination: CalculatorType) => {
+        onPushData('dscr', destination);
+        setIsPushMenuOpen(false);
+    };
+    
+    const handleDscrExport = async (option: 'lender' | 'investor' | 'both') => {
+        setIsExportMenuOpen(false);
+        const element = document.getElementById(CALCULATOR_ID);
+        if (!element) return;
+
+        const actions = element.querySelector(`.${ACTIONS_CLASS}`) as HTMLElement;
+        const lenderTabContent = element.querySelector('#dscr-lender-view') as HTMLElement;
+        const investorTabContent = element.querySelector('#dscr-investor-view') as HTMLElement;
+        const tabButtons = element.querySelector('#dscr-tabs') as HTMLElement;
+
+        if (actions) actions.style.display = 'none';
+
+        const originalLenderDisplay = lenderTabContent.style.display;
+        const originalInvestorDisplay = investorTabContent.style.display;
+
+        // @ts-ignore
+        const opt = { margin: 0.5, filename: `DSCR_Analysis_${option}_${new Date().toISOString().slice(0, 10)}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+
+        if (option === 'lender') {
+            investorTabContent.style.display = 'none';
+            lenderTabContent.style.display = 'block';
+            // @ts-ignore
+            await html2pdf().set(opt).from(element).save();
+        } else if (option === 'investor') {
+            lenderTabContent.style.display = 'none';
+            investorTabContent.style.display = 'block';
+             // @ts-ignore
+            await html2pdf().set(opt).from(element).save();
+        } else if (option === 'both') {
+            lenderTabContent.style.display = 'block';
+            investorTabContent.style.display = 'block';
+            if (tabButtons) tabButtons.style.display = 'none';
+
+            const pageBreak = document.createElement('div');
+            pageBreak.className = 'html2pdf__page-break';
+            investorTabContent.prepend(pageBreak);
+            
+             // @ts-ignore
+            await html2pdf().set(opt).from(element).save();
+            investorTabContent.removeChild(pageBreak);
+        }
+        
+        if (actions) actions.style.display = 'flex';
+        if (tabButtons) tabButtons.style.display = 'flex';
+        lenderTabContent.style.display = originalLenderDisplay;
+        investorTabContent.style.display = originalInvestorDisplay;
+    };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-5">
+        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-extrabold tracking-wide text-lg mb-3">DSCR Analysis</h2>
+            
+             <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+                <div className="relative">
+                    <button onClick={() => setIsPushMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
+                        Send Data To...
+                    </button>
+                    {isPushMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+                            <ul className="py-1">
+                                {availableDestinations.map(key => (
+                                    <li key={key}><button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{calculatorNames[key]}</button></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+                 <div className="relative">
+                    <button onClick={() => setIsExportMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
+                        Export PDF
+                    </button>
+                     {isExportMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+                            <ul className="py-1">
+                                <li><button onClick={() => handleDscrExport('lender')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Lender View</button></li>
+                                <li><button onClick={() => handleDscrExport('investor')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Investor View</button></li>
+                                <li><button onClick={() => handleDscrExport('both')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">Both Views</button></li>
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-            <div className="flex gap-2 border-b mb-4">
+            <div id="dscr-tabs" className="flex gap-2 border-b mb-4">
                 <button onClick={() => setActiveSubTab('lender')} className={`py-2 px-4 font-bold ${activeSubTab === 'lender' ? 'border-b-2 border-slate-800' : 'text-slate-500'}`}>Lender Facing</button>
                 <button onClick={() => setActiveSubTab('investor')} className={`py-2 px-4 font-bold ${activeSubTab === 'investor' ? 'border-b-2 border-slate-800' : 'text-slate-500'}`}>Investor Facing</button>
             </div>
 
             {/* Lender Facing Tab */}
-            <div className={activeSubTab === 'lender' ? '' : 'hidden'}>
+            <div id="dscr-lender-view" style={{ display: activeSubTab === 'lender' ? 'block' : 'none' }}>
                 <div className="flex justify-center gap-4 mb-4 p-2 rounded-lg bg-slate-100">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="propertyType" value="LTR" checked={data.propertyType === 'LTR'} onChange={() => onRadioChange('propertyType', 'LTR')} className="form-radio h-4 w-4 text-slate-600" />
@@ -239,7 +334,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
             </div>
 
             {/* Investor Facing Tab */}
-            <div className={activeSubTab === 'investor' ? '' : 'hidden'}>
+            <div id="dscr-investor-view" style={{ display: activeSubTab === 'investor' ? 'block' : 'none' }}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <SectionHeader>Property & Loan</SectionHeader>
                     <ReadOnlyField label="Purchase Price" value={money(data.purchase)} />

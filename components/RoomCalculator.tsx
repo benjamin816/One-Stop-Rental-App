@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import { pmt, loanAmt, money } from '../utils/calculators';
-import type { RoomData, RentalUnit } from '../App';
+import type { RoomData, RentalUnit, CalculatorType } from '../App';
 
 interface RoomCalculatorProps {
     data: RoomData;
@@ -13,14 +13,20 @@ interface RoomCalculatorProps {
     removeRentalUnit: (id: string) => void;
     updateRentalUnitRent: (id: string, rent: string) => void;
     setOwnerOccupiedUnit: (id: string) => void;
+    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
+    onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <h3 className="font-bold text-md mt-6 mb-2 border-b pb-1 col-span-1 md:col-span-2">{children}</h3>
 );
 
-const RoomCalculator: React.FC<RoomCalculatorProps> = ({ data, onChange, onCheckboxChange, rentalUnits, addRentalUnit, removeRentalUnit, updateRentalUnitRent, setOwnerOccupiedUnit }) => {
-    
+const calculatorNames: Record<CalculatorType, string> = {
+    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+};
+
+const RoomCalculator: React.FC<RoomCalculatorProps> = ({ data, onChange, onCheckboxChange, rentalUnits, addRentalUnit, removeRentalUnit, updateRentalUnitRent, setOwnerOccupiedUnit, onPushData, onExportPdf }) => {
+    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
     const metrics = useMemo(() => {
         const ownerOccupiedUnit = rentalUnits.find(u => u.ownerOccupied);
 
@@ -62,10 +68,40 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({ data, onChange, onCheck
     
     // This object is reset on each render to correctly number the units in the UI
     let currentCounts: Record<'Room' | 'ADU' | 'Unit', number> = { Room: 0, ADU: 0, Unit: 0 };
+    
+    const CALCULATOR_ID = "room-calculator";
+    const ACTIONS_CLASS = "room-actions";
+    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'room');
+
+    const handlePushClick = (destination: CalculatorType) => {
+        onPushData('room', destination);
+        setIsPushMenuOpen(false);
+    };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-5">
+        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-extrabold tracking-wide text-lg mb-3">By-the-Room (House Hack)</h2>
+
+            <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+                <div className="relative">
+                    <button onClick={() => setIsPushMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
+                        Send Data To...
+                    </button>
+                    {isPushMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+                            <ul className="py-1">
+                                {availableDestinations.map(key => (
+                                    <li key={key}><button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{calculatorNames[key]}</button></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+                <button onClick={() => onExportPdf(CALCULATOR_ID, 'ByTheRoom_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
+                    Export PDF
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SectionHeader>The Purchase</SectionHeader>
                 <InputField label="Purchase" id="rm_purchase" value={data.purchase} onChange={e => onChange('purchase', e.target.value)} min={50000} max={1500000} step={1000} />

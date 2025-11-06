@@ -1,9 +1,10 @@
 
-import React, { useMemo } from 'react';
+
+import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import { pmt, money } from '../utils/calculators';
-import type { BuildData, BuildUnitData, PropertyType, LandAcquisition, UnitStrategy } from '../App';
+import type { BuildData, BuildUnitData, PropertyType, LandAcquisition, UnitStrategy, CalculatorType } from '../App';
 
 interface BuildCalculatorProps {
     data: BuildData;
@@ -14,6 +15,8 @@ interface BuildCalculatorProps {
     onUnitCheckboxChange: (id: string, field: keyof BuildUnitData, checked: boolean) => void;
     onUnitStrategyChange: (id: string, strategy: UnitStrategy) => void;
     onApplyAllChange: (checked: boolean) => void;
+    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
+    onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -78,8 +81,12 @@ const UnitCard: React.FC<{ unit: BuildUnitData; index: number; onChange: BuildCa
     );
 };
 
+const calculatorNames: Record<CalculatorType, string> = {
+    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+};
 
-const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataChange, onPropTypeChange, onUnitChange, onUnitCheckboxChange, onUnitStrategyChange, onApplyAllChange }) => {
+const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataChange, onPropTypeChange, onUnitChange, onUnitCheckboxChange, onUnitStrategyChange, onApplyAllChange, onPushData, onExportPdf }) => {
+    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
     
     const metrics = useMemo(() => {
         let loanableCostBase = data.hardCosts + data.softCosts + data.buffer;
@@ -139,10 +146,30 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
     const maintMonthly = (metrics.totalRevenue * data.maintPct) / 100;
     const capexMonthly = (metrics.totalRevenue * data.capexPct) / 100;
 
+    const CALCULATOR_ID = "build-calculator";
+    const ACTIONS_CLASS = "build-actions";
+    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'build');
+
+    const handlePushClick = (destination: CalculatorType) => {
+        onPushData('build', destination);
+        setIsPushMenuOpen(false);
+    };
+
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-5">
+        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-extrabold tracking-wide text-lg mb-3">New Construction Analysis</h2>
             
+            <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+                <div className="relative">
+                     <button title="Push data from this calculator is not supported" disabled className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-400 cursor-not-allowed transition-colors duration-200 text-sm">
+                        Send Data To...
+                    </button>
+                </div>
+                <button onClick={() => onExportPdf(CALCULATOR_ID, 'NewBuild_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
+                    Export PDF
+                </button>
+            </div>
+
             <SectionHeader>Project Setup</SectionHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>

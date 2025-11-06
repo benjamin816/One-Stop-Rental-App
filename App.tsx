@@ -93,6 +93,8 @@ export interface DscrData {
 export type PropertyType = 'SFH' | 'Townhome' | 'Condo' | 'Duplex' | 'Triplex' | 'Quadplex';
 export type LandAcquisition = 'cash' | 'finance' | 'owned';
 export type UnitStrategy = 'LTR' | 'STR';
+export type CalculatorType = 'ltr' | 'room' | 'str' | 'multi' | 'build' | 'dscr';
+
 
 export interface BuildData {
     propertyType: PropertyType;
@@ -412,6 +414,86 @@ const App: React.FC = () => {
         setMultiUnits(prev => prev.map(u => u.id === id ? { ...u, rent: num(rent) } : u));
     }, []);
 
+    // New Handlers for Export and Data Push
+    const handleExportPdf = useCallback((elementId: string, filename: string, actionsClass: string) => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            const actions = element.querySelector(`.${actionsClass}`);
+            const originalDisplay = actions ? (actions as HTMLElement).style.display : '';
+            if (actions) (actions as HTMLElement).style.display = 'none';
+
+            const opt = {
+                margin: 0.5,
+                filename: `${filename}_${new Date().toISOString().slice(0, 10)}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            // @ts-ignore
+            html2pdf().set(opt).from(element).save().then(() => {
+                if (actions) (actions as HTMLElement).style.display = originalDisplay;
+            });
+        } else {
+            console.error('Could not find element to export:', elementId);
+        }
+    }, []);
+
+    const handlePushData = useCallback((source: CalculatorType, destination: CalculatorType) => {
+        let commonData: Partial<LtrData & StrData & RoomData & MultiUnitData> = {};
+
+        switch (source) {
+            case 'ltr':
+                commonData = { ...ltrData };
+                break;
+            case 'room':
+                commonData = { ...roomData, rent: rentalUnits.reduce((acc, u) => acc + u.rent, 0) };
+                break;
+            case 'str':
+                commonData = { ...strData, rent: strData.adr * (30.44 * (strData.occ / 100)) };
+                break;
+            case 'multi':
+                commonData = { ...multiUnitData, rent: multiUnits.reduce((acc, u) => acc + u.rent, 0) };
+                break;
+            case 'dscr':
+                commonData = {
+                    purchase: dscrData.purchase, downPct: dscrData.downPct, downAmt: dscrData.downAmt, cc: dscrData.cc, renovation: dscrData.renovation,
+                    rate: dscrData.rate, term: dscrData.term, taxYr: dscrData.taxYr, taxRate: dscrData.taxRate, insMo: dscrData.insMo, hoa: dscrData.hoa,
+                    utilities: dscrData.inv_utilities, maintPct: dscrData.inv_maintPct, capexPct: dscrData.inv_capexPct, pmPct: dscrData.inv_pmPct,
+                    rent: dscrData.ltr_rent, adr: dscrData.str_adr, occ: dscrData.str_occ,
+                };
+                break;
+        }
+
+        const { rent, adr, occ, ...baseData } = commonData;
+
+        switch (destination) {
+            case 'ltr':
+                setLtrData(prev => ({ ...prev, ...baseData, rent: rent || prev.rent }));
+                break;
+            case 'room':
+                setRoomData(prev => ({ ...prev, ...baseData, pmPct: baseData.pmPct || prev.pmPct }));
+                break;
+            case 'str':
+                setStrData(prev => ({ ...prev, ...baseData, adr: adr || prev.adr, occ: occ || prev.occ }));
+                break;
+            case 'multi':
+                setMultiUnitData(prev => ({ ...prev, ...baseData }));
+                break;
+            case 'dscr':
+                setDscrData(prev => ({
+                    ...prev, purchase: baseData.purchase || prev.purchase, downPct: baseData.downPct || prev.downPct, downAmt: baseData.downAmt || prev.downAmt,
+                    cc: baseData.cc || prev.cc, renovation: baseData.renovation || prev.renovation, rate: baseData.rate || prev.rate, term: baseData.term || prev.term,
+                    taxYr: baseData.taxYr || prev.taxYr, taxRate: baseData.taxRate || prev.taxRate, insMo: baseData.insMo || prev.insMo, hoa: baseData.hoa || prev.hoa,
+                    ltr_rent: rent || prev.ltr_rent, str_adr: adr || prev.str_adr, str_occ: occ || prev.str_occ,
+                    inv_utilities: baseData.utilities || prev.inv_utilities, inv_pmPct: baseData.pmPct || prev.inv_pmPct,
+                    inv_maintPct: baseData.maintPct || prev.inv_maintPct, inv_capexPct: baseData.capexPct || prev.inv_capexPct,
+                }));
+                break;
+        }
+        setActiveTab(destination);
+    }, [ltrData, roomData, strData, multiUnitData, dscrData, rentalUnits, multiUnits]);
+
+
     return (
         <div className="bg-slate-100 min-h-screen">
             <Header />
@@ -426,7 +508,7 @@ const App: React.FC = () => {
                 </nav>
 
                 <div className={activeTab === 'ltr' ? '' : 'hidden'}>
-                    <LtrCalculator data={ltrData} onChange={handleLtrChange} onCheckboxChange={handleLtrCheckboxChange} />
+                    <LtrCalculator data={ltrData} onChange={handleLtrChange} onCheckboxChange={handleLtrCheckboxChange} onPushData={handlePushData} onExportPdf={handleExportPdf} />
                 </div>
                 <div className={activeTab === 'room' ? '' : 'hidden'}>
                     <RoomCalculator 
@@ -438,10 +520,12 @@ const App: React.FC = () => {
                         removeRentalUnit={removeRentalUnit}
                         updateRentalUnitRent={updateRentalUnitRent}
                         setOwnerOccupiedUnit={setOwnerOccupiedUnit}
+                        onPushData={handlePushData}
+                        onExportPdf={handleExportPdf}
                     />
                 </div>
                  <div className={activeTab === 'str' ? '' : 'hidden'}>
-                    <StrCalculator data={strData} onChange={handleStrChange} onCheckboxChange={handleStrCheckboxChange} />
+                    <StrCalculator data={strData} onChange={handleStrChange} onCheckboxChange={handleStrCheckboxChange} onPushData={handlePushData} onExportPdf={handleExportPdf} />
                 </div>
                  <div className={activeTab === 'multi' ? '' : 'hidden'}>
                     <MultiUnitCalculator 
@@ -452,6 +536,8 @@ const App: React.FC = () => {
                         addUnit={addMultiUnit}
                         removeUnit={removeMultiUnit}
                         updateUnitRent={updateMultiUnitRent}
+                        onPushData={handlePushData}
+                        onExportPdf={handleExportPdf}
                     />
                 </div>
                 <div className={activeTab === 'build' ? '' : 'hidden'}>
@@ -464,6 +550,8 @@ const App: React.FC = () => {
                         onUnitCheckboxChange={handleBuildUnitCheckboxChange}
                         onUnitStrategyChange={handleBuildUnitStrategyChange}
                         onApplyAllChange={handleApplyAllChange}
+                        onPushData={handlePushData}
+                        onExportPdf={handleExportPdf}
                     />
                 </div>
                  <div className={activeTab === 'dscr' ? '' : 'hidden'}>
@@ -472,6 +560,7 @@ const App: React.FC = () => {
                         onChange={handleDscrChange} 
                         onCheckboxChange={handleDscrCheckboxChange}
                         onRadioChange={handleDscrRadioChange}
+                        onPushData={handlePushData}
                     />
                 </div>
             </main>

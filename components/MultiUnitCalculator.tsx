@@ -1,9 +1,10 @@
 
-import React, { useMemo } from 'react';
+
+import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import { pmt, loanAmt, money } from '../utils/calculators';
-import type { MultiUnitData, MultiUnitItem } from '../App';
+import type { MultiUnitData, MultiUnitItem, CalculatorType } from '../App';
 
 interface MultiUnitCalculatorProps {
     data: MultiUnitData;
@@ -13,14 +14,20 @@ interface MultiUnitCalculatorProps {
     addUnit: () => void;
     removeUnit: (id: string) => void;
     updateUnitRent: (id: string, rent: string) => void;
+    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
+    onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <h3 className="font-bold text-md mt-6 mb-2 border-b pb-1 col-span-1 md:col-span-2">{children}</h3>
 );
 
-const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, onChange, onCheckboxChange, addUnit, removeUnit, updateUnitRent }) => {
-    
+const calculatorNames: Record<CalculatorType, string> = {
+    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+};
+
+const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, onChange, onCheckboxChange, addUnit, removeUnit, updateUnitRent, onPushData, onExportPdf }) => {
+    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
     const metrics = useMemo(() => {
         const totalRent = units.reduce((acc, unit) => acc + unit.rent, 0);
 
@@ -44,10 +51,40 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
             opex, cf, coc, totalRent
         };
     }, [data, units]);
+
+    const CALCULATOR_ID = "multi-calculator";
+    const ACTIONS_CLASS = "multi-actions";
+    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'multi');
+
+    const handlePushClick = (destination: CalculatorType) => {
+        onPushData('multi', destination);
+        setIsPushMenuOpen(false);
+    };
     
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-5">
+        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
             <h2 className="font-extrabold tracking-wide text-lg mb-3">Multi-Unit Property Analysis</h2>
+
+             <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+                <div className="relative">
+                    <button onClick={() => setIsPushMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
+                        Send Data To...
+                    </button>
+                    {isPushMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+                            <ul className="py-1">
+                                {availableDestinations.map(key => (
+                                    <li key={key}><button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{calculatorNames[key]}</button></li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+                <button onClick={() => onExportPdf(CALCULATOR_ID, 'MultiUnit_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
+                    Export PDF
+                </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <SectionHeader>The Purchase</SectionHeader>
                 <InputField label="Purchase" id="mu_purchase" value={data.purchase} onChange={e => onChange('purchase', e.target.value)} min={50000} max={5000000} step={10000} />
