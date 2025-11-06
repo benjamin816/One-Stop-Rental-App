@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import Header from './components/Header';
+import Footer from './components/Footer';
 import LtrCalculator from './components/LtrCalculator';
 import RoomCalculator from './components/RoomCalculator';
 import StrCalculator from './components/StrCalculator';
@@ -495,9 +496,9 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="bg-slate-100 min-h-screen">
+        <div className="bg-slate-100 min-h-screen flex flex-col">
             <Header />
-            <main className="container mx-auto p-4">
+            <main className="container mx-auto p-4 flex-grow">
                 <nav className="flex justify-center items-center mb-6 bg-white rounded-full shadow-md p-1 overflow-x-auto">
                     <Tab active={activeTab === 'ltr'} onClick={() => setActiveTab('ltr')}>LTR</Tab>
                     <Tab active={activeTab === 'room'} onClick={() => setActiveTab('room')}>By-the-Room</Tab>
@@ -564,6 +565,7 @@ const App: React.FC = () => {
                     />
                 </div>
             </main>
+            <Footer />
         </div>
     );
 };
