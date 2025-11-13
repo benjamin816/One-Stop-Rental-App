@@ -169,7 +169,7 @@ const initialStrData: StrData = {
 const initialDscrData: DscrData = {
     propertyType: 'LTR', purchase: 500000, downPct: 25, downAmt: 125000, cc: 15000, rate: 7.5, term: 30, renovation: 0, renoFinancedHM: false, hm_rate: 12, hm_term: 1,
     ltr_rent: 4000, str_adr: 300, str_occ: 70, taxYr: 6000, taxRate: 1.2, insMo: 175, hoa: 0, stress_vacancy: 5, stress_rate: 9.5, min_dscr: 1.0,
-    inv_pmPct: 8, inv_maintPct: 5, inv_capexPct: 5, inv_utilities: 0, inv_platformPct: 3, inv_suppliesMo: 150, inv_clean: 150, inv_stays: 8,
+    inv_pmPct: 15, inv_maintPct: 5, inv_capexPct: 5, inv_utilities: 300, inv_platformPct: 3, inv_suppliesMo: 150, inv_clean: 0, inv_stays: 8,
 };
 
 const initialBuildData: BuildData = {

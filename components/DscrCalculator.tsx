@@ -34,6 +34,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
     const [activeSubTab, setActiveSubTab] = useState<'lender' | 'investor'>('lender');
     const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+    const [isStressTestDisabled, setIsStressTestDisabled] = useState(true);
 
     // Effect to set default stress values when property type changes
     useEffect(() => {
@@ -42,7 +43,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
             onChange('min_dscr', 1.0);
         } else { // STR
             onChange('stress_vacancy', 15);
-            onChange('min_dscr', 1.25);
+            onChange('min_dscr', 1.0);
         }
         // Also update stress rate based on current rate
         onChange('stress_rate', parseFloat((data.rate + 2).toFixed(2)));
@@ -62,12 +63,14 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
             ? data.ltr_rent 
             : data.str_adr * (30.44 * (data.str_occ / 100));
         
-        const effectiveGrossIncome = grossMonthlyIncome * 12 * (1 - (data.stress_vacancy / 100));
+        const effectiveVacancy = isStressTestDisabled ? 0 : data.stress_vacancy;
+        const effectiveGrossIncome = grossMonthlyIncome * 12 * (1 - (effectiveVacancy / 100));
 
         const lenderOpex = (data.taxYr + (data.insMo * 12) + (data.hoa * 12));
         const noi = effectiveGrossIncome - lenderOpex;
         
-        const primaryDebtService = pmt(loan, data.stress_rate, data.term) * 12;
+        const effectiveStressRate = isStressTestDisabled ? data.rate : data.stress_rate;
+        const primaryDebtService = pmt(loan, effectiveStressRate, data.term) * 12;
         
         const hm_payment = data.renoFinancedHM ? pmt(data.renovation, data.hm_rate, data.hm_term) : 0;
         const hm_debtService = hm_payment * 12;
@@ -80,7 +83,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         const cashFlowAfterHM_annual = noi - primaryDebtService;
 
         return { loan, noi, totalDebtService, dscr, grossMonthlyIncome, hm_payment, hm_debtService, primaryDebtService, cashFlow_annual, cashFlowAfterHM_annual };
-    }, [data]);
+    }, [data, isStressTestDisabled]);
 
     const investorMetrics = useMemo(() => {
         const loan = loanAmt(data.purchase, data.downPct);
@@ -290,8 +293,14 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
                     <InputField label="HOA ($/mo)" id="dscr_hoa" value={data.hoa} onChange={e => onChange('hoa', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.hoa * 12)}/yr`} />
 
                     <SectionHeader>Lender Stress Test</SectionHeader>
-                    <InputField label="Rent Haircut (%)" id="dscr_stress_vacancy" value={data.stress_vacancy} onChange={e => onChange('stress_vacancy', e.target.value)} min={0} max={50} step={0.5} infoText="Standard haircut on gross rent." />
-                    <InputField label="Stress Test Rate (%)" id="dscr_stress_rate" value={data.stress_rate} onChange={e => onChange('stress_rate', e.target.value)} min={0} max={15} step={0.05} infoText="Defaults to Note Rate + 2%" />
+                     <div className="col-span-1 md:col-span-2 mb-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+                            <input type="checkbox" checked={isStressTestDisabled} onChange={e => setIsStressTestDisabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500 cursor-pointer" />
+                            Disable Stress Test (Use Note Rate & 0% Rent Haircut)
+                        </label>
+                    </div>
+                    <InputField label="Rent Haircut (%)" id="dscr_stress_vacancy" value={data.stress_vacancy} onChange={e => onChange('stress_vacancy', e.target.value)} min={0} max={50} step={0.5} infoText="Standard haircut on gross rent." disabled={isStressTestDisabled} />
+                    <InputField label="Stress Test Rate (%)" id="dscr_stress_rate" value={data.stress_rate} onChange={e => onChange('stress_rate', e.target.value)} min={0} max={15} step={0.05} infoText="Defaults to Note Rate + 2%" disabled={isStressTestDisabled} />
                     <InputField label="Minimum DSCR" id="dscr_min_dscr" value={data.min_dscr} onChange={e => onChange('min_dscr', e.target.value)} min={1} max={2} step={0.01} infoText="Lender's minimum required ratio." />
                 </div>
                 <hr className="my-4" />
