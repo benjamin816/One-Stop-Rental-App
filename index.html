@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -10,6 +9,57 @@
     <style>
       body {
         background-color: #0f172a;
+      }
+
+      /* PDF Export Specific Styles */
+      .export-mode {
+        box-shadow: none !important;
+        border: none !important;
+        background: white !important;
+      }
+
+      .export-mode input[type="range"],
+      .export-mode .html2pdf__page-break {
+        display: none !important;
+      }
+
+      .export-mode input[type="text"],
+      .export-mode select {
+        border: none !important;
+        background: transparent !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        appearance: none !important;
+        font-weight: 600 !important;
+        color: #1e293b !important; /* slate-800 */
+        pointer-events: none !important;
+      }
+
+      .export-mode .bg-slate-100,
+      .export-mode .bg-slate-50,
+      .export-mode .bg-white {
+        background-color: transparent !important;
+        box-shadow: none !important;
+      }
+
+      .export-mode .border-slate-300,
+      .export-mode .border-slate-200 {
+        border-color: #f1f5f9 !important; /* slate-100 */
+      }
+
+      .export-mode button,
+      .export-mode label input[type="checkbox"] {
+        display: none !important;
+      }
+
+      /* Keep owner occupied text but hide the checkbox */
+      .export-mode label {
+        pointer-events: none !important;
+      }
+      
+      .export-mode .rounded-xl,
+      .export-mode .rounded-2xl {
+        border-radius: 0 !important;
       }
     </style>
   <script type="importmap">

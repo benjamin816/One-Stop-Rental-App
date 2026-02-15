@@ -213,7 +213,7 @@ const App: React.FC = () => {
         { id: uuidv4(), rent: 1500 },
     ]);
 
-    const genericHandler = <T,>(setter: React.Dispatch<React.SetStateAction<T>>) => (field: keyof T, value: string) => {
+    const genericHandler = <T extends object>(setter: React.Dispatch<React.SetStateAction<T>>) => (field: keyof T, value: string) => {
         setter(prev => {
             const newState = { ...prev };
             const purchase = (newState as any).purchase ?? (newState as any).arv ?? 0;
@@ -256,7 +256,7 @@ const App: React.FC = () => {
         });
     };
     
-    const genericCheckboxHandler = <T,>(setter: React.Dispatch<React.SetStateAction<T>>) => (field: keyof T, checked: boolean) => {
+    const genericCheckboxHandler = <T extends object>(setter: React.Dispatch<React.SetStateAction<T>>) => (field: keyof T, checked: boolean) => {
         setter(prev => ({ ...prev, [field]: checked }));
     };
 
@@ -416,24 +416,37 @@ const App: React.FC = () => {
     }, []);
 
     // New Handlers for Export and Data Push
-    const handleExportPdf = useCallback((elementId: string, filename: string, actionsClass: string) => {
+    const handleExportPdf = useCallback(async (elementId: string, filename: string, actionsClass: string) => {
         const element = document.getElementById(elementId);
         if (element) {
+            // Apply export mode class
+            element.classList.add('export-mode');
+            
             const actions = element.querySelector(`.${actionsClass}`);
             const originalDisplay = actions ? (actions as HTMLElement).style.display : '';
             if (actions) (actions as HTMLElement).style.display = 'none';
 
             const opt = {
-                margin: 0.5,
+                margin: [0.5, 0.5],
                 filename: `${filename}_${new Date().toISOString().slice(0, 10)}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: { 
+                  scale: 2, 
+                  useCORS: true,
+                  logging: false,
+                  letterRendering: true
+                },
                 jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
-            // @ts-ignore
-            html2pdf().set(opt).from(element).save().then(() => {
-                if (actions) (actions as HTMLElement).style.display = originalDisplay;
-            });
+            
+            try {
+              // @ts-ignore
+              await html2pdf().set(opt).from(element).save();
+            } finally {
+              // Cleanup: restore display and remove class
+              if (actions) (actions as HTMLElement).style.display = originalDisplay;
+              element.classList.remove('export-mode');
+            }
         } else {
             console.error('Could not find element to export:', elementId);
         }

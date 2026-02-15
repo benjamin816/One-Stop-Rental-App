@@ -136,47 +136,62 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         const element = document.getElementById(CALCULATOR_ID);
         if (!element) return;
 
+        // Apply export mode class
+        element.classList.add('export-mode');
+
         const actions = element.querySelector(`.${ACTIONS_CLASS}`) as HTMLElement;
         const lenderTabContent = element.querySelector('#dscr-lender-view') as HTMLElement;
         const investorTabContent = element.querySelector('#dscr-investor-view') as HTMLElement;
         const tabButtons = element.querySelector('#dscr-tabs') as HTMLElement;
 
-        if (actions) actions.style.display = 'none';
-
         const originalLenderDisplay = lenderTabContent.style.display;
         const originalInvestorDisplay = investorTabContent.style.display;
+        const originalActionsDisplay = actions ? actions.style.display : '';
+        const originalTabsDisplay = tabButtons ? tabButtons.style.display : '';
+
+        if (actions) actions.style.display = 'none';
 
         // @ts-ignore
-        const opt = { margin: 0.5, filename: `DSCR_Analysis_${option}_${new Date().toISOString().slice(0, 10)}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+        const opt = { 
+          margin: [0.5, 0.5], 
+          filename: `DSCR_Analysis_${option}_${new Date().toISOString().slice(0, 10)}.pdf`, 
+          image: { type: 'jpeg', quality: 0.98 }, 
+          html2canvas: { scale: 2, useCORS: true }, 
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } 
+        };
 
-        if (option === 'lender') {
-            investorTabContent.style.display = 'none';
-            lenderTabContent.style.display = 'block';
-            // @ts-ignore
-            await html2pdf().set(opt).from(element).save();
-        } else if (option === 'investor') {
-            lenderTabContent.style.display = 'none';
-            investorTabContent.style.display = 'block';
-             // @ts-ignore
-            await html2pdf().set(opt).from(element).save();
-        } else if (option === 'both') {
-            lenderTabContent.style.display = 'block';
-            investorTabContent.style.display = 'block';
-            if (tabButtons) tabButtons.style.display = 'none';
+        try {
+            if (option === 'lender') {
+                investorTabContent.style.display = 'none';
+                lenderTabContent.style.display = 'block';
+                // @ts-ignore
+                await html2pdf().set(opt).from(element).save();
+            } else if (option === 'investor') {
+                lenderTabContent.style.display = 'none';
+                investorTabContent.style.display = 'block';
+                 // @ts-ignore
+                await html2pdf().set(opt).from(element).save();
+            } else if (option === 'both') {
+                lenderTabContent.style.display = 'block';
+                investorTabContent.style.display = 'block';
+                if (tabButtons) tabButtons.style.display = 'none';
 
-            const pageBreak = document.createElement('div');
-            pageBreak.className = 'html2pdf__page-break';
-            investorTabContent.prepend(pageBreak);
-            
-             // @ts-ignore
-            await html2pdf().set(opt).from(element).save();
-            investorTabContent.removeChild(pageBreak);
+                const pageBreak = document.createElement('div');
+                pageBreak.className = 'html2pdf__page-break';
+                investorTabContent.prepend(pageBreak);
+                
+                 // @ts-ignore
+                await html2pdf().set(opt).from(element).save();
+                investorTabContent.removeChild(pageBreak);
+            }
+        } finally {
+            // Restore visibility and remove class
+            if (actions) actions.style.display = originalActionsDisplay;
+            if (tabButtons) tabButtons.style.display = originalTabsDisplay;
+            lenderTabContent.style.display = originalLenderDisplay;
+            investorTabContent.style.display = originalInvestorDisplay;
+            element.classList.remove('export-mode');
         }
-        
-        if (actions) actions.style.display = 'flex';
-        if (tabButtons) tabButtons.style.display = 'flex';
-        lenderTabContent.style.display = originalLenderDisplay;
-        investorTabContent.style.display = originalInvestorDisplay;
     };
 
     return (
