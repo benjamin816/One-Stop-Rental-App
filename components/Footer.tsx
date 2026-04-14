@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
                 <p className="font-semibold text-lg mb-2">Benjamin Carver</p>
                 <p className="text-sm mb-2">Raleigh-Durham NC Realtor & Investor</p>
                 <div className="flex justify-center items-center gap-x-4 gap-y-2 flex-wrap mb-4 text-sm">
-                    <a href="mailto:benjamin@triangleexperts.com" className="hover:text-white transition-colors">benjamin@triangleexperts.com</a>
+                    <a href="mailto:benjamin.carver@exprealty.com" className="hover:text-white transition-colors">benjamin.carver@exprealty.com</a>
                     <span className="hidden sm:inline">|</span>
                     <a href="tel:919-343-5055" className="hover:text-white transition-colors">919-343-5055</a>
                 </div>

@@ -1,237 +1,363 @@
 import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
+import NewConstructionRider from './NewConstructionRider';
 import { pmt, loanAmt, money } from '../utils/calculators';
+import {
+  applyRiderToCoreMetrics,
+  defaultNewConstructionRiderState,
+  getNewConstructionRiderImpact
+} from '../utils/newConstructionRider';
 import type { RoomData, RentalUnit, CalculatorType } from '../App';
 
 interface RoomCalculatorProps {
-    data: RoomData;
-    onChange: (field: keyof RoomData, value: string) => void;
-    onCheckboxChange: (field: keyof RoomData, checked: boolean) => void;
-    rentalUnits: RentalUnit[];
-    addRentalUnit: (type: 'Room' | 'ADU' | 'Unit', rent?: number) => void;
-    removeRentalUnit: (id: string) => void;
-    updateRentalUnitRent: (id: string, rent: string) => void;
-    setOwnerOccupiedUnit: (id: string) => void;
-    onPushData: (source: CalculatorType, destination: CalculatorType) => void;
-    onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
+  data: RoomData;
+  onChange: (field: keyof RoomData, value: string) => void;
+  onCheckboxChange: (field: keyof RoomData, checked: boolean) => void;
+  rentalUnits: RentalUnit[];
+  addRentalUnit: (type: 'Room' | 'ADU' | 'Unit', rent?: number) => void;
+  removeRentalUnit: (id: string) => void;
+  updateRentalUnitRent: (id: string, rent: string) => void;
+  setOwnerOccupiedUnit: (id: string) => void;
+  onPushData: (source: CalculatorType, destination: CalculatorType) => void;
+  onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <h3 className="font-bold text-md mt-6 mb-2 border-b pb-1 col-span-1 md:col-span-2">{children}</h3>
+  <h3 className="font-bold text-md mt-6 mb-2 border-b pb-1 col-span-1 md:col-span-2">{children}</h3>
 );
 
 const calculatorNames: Record<CalculatorType, string> = {
-    ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
+  ltr: 'LTR',
+  room: 'By-the-Room',
+  str: 'STR',
+  multi: 'Multi-Unit',
+  build: 'New Build',
+  dscr: 'DSCR Loan'
 };
 
-const RoomCalculator: React.FC<RoomCalculatorProps> = ({ data, onChange, onCheckboxChange, rentalUnits, addRentalUnit, removeRentalUnit, updateRentalUnitRent, setOwnerOccupiedUnit, onPushData, onExportPdf }) => {
-    const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
-    const metrics = useMemo(() => {
-        const ownerOccupiedUnit = rentalUnits.find(u => u.ownerOccupied);
+const RoomCalculator: React.FC<RoomCalculatorProps> = ({
+  data,
+  onChange,
+  onCheckboxChange,
+  rentalUnits,
+  addRentalUnit,
+  removeRentalUnit,
+  updateRentalUnitRent,
+  setOwnerOccupiedUnit,
+  onPushData,
+  onExportPdf
+}) => {
+  const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
+  const [rider, setRider] = useState(defaultNewConstructionRiderState);
+  const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
 
-        const totalRentMovedOut = rentalUnits.reduce((acc, unit) => acc + unit.rent, 0);
-        const totalRentLivingIn = ownerOccupiedUnit ? totalRentMovedOut - ownerOccupiedUnit.rent : totalRentMovedOut;
+  const metrics = useMemo(() => {
+    const ownerOccupiedUnit = rentalUnits.find(u => u.ownerOccupied);
 
-        const purchaseLoan = loanAmt(data.purchase, data.downPct);
-        const loan = data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan;
-        const pi = pmt(loan, data.rate, data.term);
-        const piti = pi + data.taxYr / 12 + data.insMo;
-        const cashIn = data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation;
-        const ccPct = data.purchase > 0 ? (data.cc / data.purchase * 100).toFixed(2) + '%' : '—';
-        
-        // Moved Out scenario
-        const opexMovedOut = data.hoa + data.utilities + totalRentMovedOut * (data.pmPct + data.maintPct + data.capexPct) / 100;
-        const cfMovedOut = totalRentMovedOut - piti - opexMovedOut;
-        const cocMovedOut = cashIn > 0 ? (cfMovedOut * 12) / cashIn * 100 : 0;
-        
-        // Living In scenario (only if owner occupied)
-        const opexLivingIn = data.hoa + data.utilities + totalRentLivingIn * (data.pmPct + data.maintPct + data.capexPct) / 100;
-        const cfLivingIn = totalRentLivingIn - piti - opexLivingIn;
-        const cocLivingIn = cashIn > 0 ? (cfLivingIn * 12) / cashIn * 100 : 0;
+    const totalRentMovedOut = rentalUnits.reduce((acc, unit) => acc + unit.rent, 0);
+    const totalRentLivingIn = ownerOccupiedUnit ? totalRentMovedOut - ownerOccupiedUnit.rent : totalRentMovedOut;
 
-        const pmMonthly = totalRentMovedOut * (data.pmPct / 100);
-        const maintMonthly = totalRentMovedOut * (data.maintPct / 100);
-        const capexMonthly = totalRentMovedOut * (data.capexPct / 100);
+    const purchaseLoan = loanAmt(data.purchase, data.downPct);
+    const loan = data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan;
+    const pi = pmt(loan, data.rate, data.term);
+    const piti = pi + data.taxYr / 12 + data.insMo;
+    const cashIn = data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation;
+    const ccPct = data.purchase > 0 ? `${(data.cc / data.purchase * 100).toFixed(2)}%` : 'N/A';
 
-        return { 
-            loan, pi, piti, cashIn, ccPct, pmMonthly, maintMonthly, capexMonthly, purchaseLoan,
-            opex: opexMovedOut,
-            cf: cfMovedOut,
-            coc: cocMovedOut,
-            totalRentLivingIn, totalRentMovedOut,
-            opexLivingIn, cfLivingIn, cocLivingIn
-        };
-    }, [data, rentalUnits]);
-    
-    const ownerOccupiedUnit = rentalUnits.find(r => r.ownerOccupied);
-    
-    // This object is reset on each render to correctly number the units in the UI
-    let currentCounts: Record<'Room' | 'ADU' | 'Unit', number> = { Room: 0, ADU: 0, Unit: 0 };
-    
-    const CALCULATOR_ID = "room-calculator";
-    const ACTIONS_CLASS = "room-actions";
-    const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'room');
+    const opexMovedOut = data.hoa + data.utilities + totalRentMovedOut * (data.pmPct + data.maintPct + data.capexPct) / 100;
+    const cfMovedOut = totalRentMovedOut - piti - opexMovedOut;
+    const cocMovedOut = cashIn > 0 ? (cfMovedOut * 12) / cashIn * 100 : 0;
 
-    const handlePushClick = (destination: CalculatorType) => {
-        onPushData('room', destination);
-        setIsPushMenuOpen(false);
+    const opexLivingIn = data.hoa + data.utilities + totalRentLivingIn * (data.pmPct + data.maintPct + data.capexPct) / 100;
+    const cfLivingIn = totalRentLivingIn - piti - opexLivingIn;
+    const cocLivingIn = cashIn > 0 ? (cfLivingIn * 12) / cashIn * 100 : 0;
+
+    const pmMonthly = totalRentMovedOut * (data.pmPct / 100);
+    const maintMonthly = totalRentMovedOut * (data.maintPct / 100);
+    const capexMonthly = totalRentMovedOut * (data.capexPct / 100);
+
+    return {
+      loan,
+      pi,
+      piti,
+      cashIn,
+      ccPct,
+      pmMonthly,
+      maintMonthly,
+      capexMonthly,
+      purchaseLoan,
+      opex: opexMovedOut,
+      cf: cfMovedOut,
+      coc: cocMovedOut,
+      totalRentLivingIn,
+      totalRentMovedOut,
+      opexLivingIn,
+      cfLivingIn,
+      cocLivingIn
     };
+  }, [data, rentalUnits]);
 
-    return (
-        <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
-            <h2 className="font-extrabold tracking-wide text-lg mb-3">By-the-Room (House Hack)</h2>
+  const riderImpact = useMemo(() => getNewConstructionRiderImpact(rider, riderAssumptions), [rider, riderAssumptions]);
+  const finalMovedOut = useMemo(
+    () => applyRiderToCoreMetrics({ piti: metrics.piti, opex: metrics.opex, cashFlow: metrics.cf, cashIn: metrics.cashIn }, rider, riderAssumptions),
+    [metrics, rider, riderAssumptions]
+  );
+  const finalLivingIn = useMemo(
+    () => applyRiderToCoreMetrics({ piti: metrics.piti, opex: metrics.opexLivingIn, cashFlow: metrics.cfLivingIn, cashIn: metrics.cashIn }, rider, riderAssumptions),
+    [metrics, rider, riderAssumptions]
+  );
 
-            <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
-                <div className="relative">
-                    <button onClick={() => setIsPushMenuOpen(prev => !prev)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
-                        Send Data To...
+  const ownerOccupiedUnit = rentalUnits.find(r => r.ownerOccupied);
+  let currentCounts: Record<'Room' | 'ADU' | 'Unit', number> = { Room: 0, ADU: 0, Unit: 0 };
+
+  const CALCULATOR_ID = 'room-calculator';
+  const ACTIONS_CLASS = 'room-actions';
+  const availableDestinations = (Object.keys(calculatorNames) as CalculatorType[]).filter(key => key !== 'room');
+
+  const handlePushClick = (destination: CalculatorType) => {
+    onPushData('room', destination);
+    setIsPushMenuOpen(false);
+  };
+
+  return (
+    <div id={CALCULATOR_ID} className="bg-white rounded-2xl shadow-lg p-5">
+      <h2 className="font-extrabold tracking-wide text-lg mb-3">By-the-Room (House Hack)</h2>
+
+      <div className={`${ACTIONS_CLASS} flex justify-end items-center gap-2 mb-4`}>
+        <div className="relative">
+          <button
+            onClick={() => setIsPushMenuOpen(prev => !prev)}
+            className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm"
+          >
+            Send Data To...
+          </button>
+          {isPushMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
+              <ul className="py-1">
+                {availableDestinations.map(key => (
+                  <li key={key}>
+                    <button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">
+                      {calculatorNames[key]}
                     </button>
-                    {isPushMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-slate-200">
-                            <ul className="py-1">
-                                {availableDestinations.map(key => (
-                                    <li key={key}><button onClick={() => handlePushClick(key)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100">{calculatorNames[key]}</button></li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-                <button onClick={() => onExportPdf(CALCULATOR_ID, 'ByTheRoom_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
-                    Export PDF
-                </button>
+                  </li>
+                ))}
+              </ul>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SectionHeader>The Purchase</SectionHeader>
-                <InputField label="Purchase" id="rm_purchase" value={data.purchase} onChange={e => onChange('purchase', e.target.value)} min={50000} max={1500000} step={1000} />
-                <InputField label="Down Payment (%)" id="rm_down_pct" value={data.downPct} onChange={e => onChange('downPct', e.target.value)} min={0} max={100} step={0.25}
-                    secondaryInput={{ label: 'or Down $', id: 'rm_down_amt', value: data.downAmt, onChange: e => onChange('downAmt', e.target.value) }} />
-                <InputField label="Closing Costs ($)" id="rm_cc" value={data.cc} onChange={e => onChange('cc', e.target.value)} min={0} max={50000} step={100} infoText={`CC = ${metrics.ccPct} of price`} />
-                <div className="col-span-1 md:col-span-2 text-xs text-slate-500 -mt-2">
-                    {data.renoFinanced ? (
-                        <span>Loan Amount = {money(metrics.purchaseLoan)} (purchase) + {money(data.renovation)} (reno) = <span className="font-semibold">{money(metrics.loan)}</span></span>
-                    ) : (
-                        <span>Loan Amount = <span className="font-semibold">{money(metrics.loan)}</span></span>
-                    )}
-                </div>
-
-                <SectionHeader>The Loan</SectionHeader>
-                <InputField label="Rate %" id="rm_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
-                <InputField label="Term" id="rm_term" value={data.term} onChange={e => onChange('term', e.target.value)} min={1} max={40} step={1} />
-
-                <SectionHeader>Renovation</SectionHeader>
-                <InputField label="Renovation ($)" id="rm_renovation" value={data.renovation} onChange={e => onChange('renovation', e.target.value)} min={0} max={200000} step={500}
-                    checkboxOption={{ label: 'Finance into loan', checked: data.renoFinanced, onChange: e => onCheckboxChange('renoFinanced', e.target.checked) }}
-                />
-
-                <SectionHeader>Operating Expenses</SectionHeader>
-                <InputField label="Taxes (annual $ / rate)" id="rm_tax_yr" value={data.taxYr} onChange={e => onChange('taxYr', e.target.value)} min={0} max={20000} step={50}
-                    secondaryInput={{ id: 'rm_tax_rate', value: data.taxRate, onChange: e => onChange('taxRate', e.target.value), min: 0, max: 5, step: 0.01 }}
-                    infoText="When you change either side, the other updates based on price."
-                    isPaired={true} />
-                <InputField label="Insurance ($/mo)" id="rm_ins_mo" value={data.insMo} onChange={e => onChange('insMo', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.insMo * 12)}/yr`} />
-                <InputField label="HOA ($/mo)" id="rm_hoa" value={data.hoa} onChange={e => onChange('hoa', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.hoa * 12)}/yr`} />
-                <InputField label="Utilities ($/mo)" id="rm_utilities" value={data.utilities} onChange={e => onChange('utilities', e.target.value)} min={0} max={1000} step={10} infoText={`= ${money(data.utilities * 12)}/yr`} />
-                <InputField label="PM (% of rent)" id="rm_pm_pct" value={data.pmPct} onChange={e => onChange('pmPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.pmMonthly)}/mo • ${money(metrics.pmMonthly * 12)}/yr`} />
-                <InputField label="Maintenance (% of rent)" id="rm_maint_pct" value={data.maintPct} onChange={e => onChange('maintPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.maintMonthly)}/mo • ${money(metrics.maintMonthly * 12)}/yr`} />
-                <InputField label="CapEx (% of rent)" id="rm_capex_pct" value={data.capexPct} onChange={e => onChange('capexPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.capexMonthly)}/mo • ${money(metrics.capexMonthly * 12)}/yr`} />
-            </div>
-
-            <div className="mt-6">
-                 <div className="flex items-center justify-between mb-2 pb-1 border-b">
-                    <h3 className="font-bold text-md">Revenue</h3>
-                    <div className="flex gap-2">
-                        <button onClick={() => addRentalUnit('Room')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">Add Room</button>
-                        <button onClick={() => addRentalUnit('ADU')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">Add ADU</button>
-                        <button onClick={() => addRentalUnit('Unit')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">Add Unit</button>
-                    </div>
-                </div>
-                <div className="mt-2 space-y-3">
-                    {rentalUnits.map((unit) => {
-                        currentCounts[unit.type]++;
-                        const unitLabel = `${unit.type} ${currentCounts[unit.type]} Rent`;
-                        return (
-                            <div key={unit.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start sm:items-center">
-                                <InputField label={unitLabel} id={unit.id} value={unit.rent} onChange={e => updateRentalUnitRent(unit.id, e.target.value)} min={0} max={3000} step={25} />
-                                <div className="flex justify-end items-center gap-4 h-full">
-                                    <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                                        <input type="checkbox" checked={unit.ownerOccupied} onChange={() => setOwnerOccupiedUnit(unit.id)} className="h-4 w-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500 cursor-pointer" />
-                                        Owner Occupied
-                                    </label>
-                                    <button onClick={() => removeRentalUnit(unit.id)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">Remove</button>
-                                </div>
-                            </div>
-                        )}
-                    )}
-                </div>
-                 <div className="mt-4 pt-2 border-t text-right">
-                    {ownerOccupiedUnit ? (
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                <span className="font-bold">Rent (Living In):</span>
-                                <span className="ml-2">{money(metrics.totalRentLivingIn)}/mo</span>
-                            </div>
-                            <div>
-                                <span className="font-bold">Rent (Moved Out):</span>
-                                <span className="ml-2">{money(metrics.totalRentMovedOut)}/mo</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-sm">
-                            <span className="font-bold">Total Monthly Rent:</span>
-                            <span className="ml-2">{money(metrics.totalRentMovedOut)}/mo</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <hr className="my-4" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <KpiCard label="Loan Amount" value={metrics.loan} />
-                <KpiCard label="Cash to Close" value={metrics.cashIn} />
-                <KpiCard label="PITI / mo" value={metrics.piti} />
-                <KpiCard label="Opex / mo" value={ownerOccupiedUnit ? money(metrics.opexLivingIn) : metrics.opex} />
-                
-                {ownerOccupiedUnit ? (
-                    <>
-                        <KpiCard label="Cash Flow / mo">
-                            <div className="flex justify-around items-center text-base">
-                                <div className="text-center w-1/2">
-                                    <span className={metrics.cfLivingIn >= 0 ? 'text-green-600' : 'text-red-600'}>{money(metrics.cfLivingIn)}</span>
-                                    <span className="block text-xs font-normal text-slate-500">Living In</span>
-                                </div>
-                                <div className="border-l border-slate-300 h-6"></div>
-                                <div className="text-center w-1/2">
-                                    <span className={metrics.cf >= 0 ? 'text-green-600' : 'text-red-600'}>{money(metrics.cf)}</span>
-                                    <span className="block text-xs font-normal text-slate-500">Moved Out</span>
-                                </div>
-                            </div>
-                        </KpiCard>
-                        <KpiCard label="Cash-on-Cash">
-                           <div className="flex justify-around items-center text-base">
-                                <div className="text-center w-1/2">
-                                    <span className={metrics.cocLivingIn >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(metrics.cocLivingIn) ? metrics.cocLivingIn.toFixed(1) + '%' : '—'}</span>
-                                    <span className="block text-xs font-normal text-slate-500">Living In</span>
-                                </div>
-                                <div className="border-l border-slate-300 h-6"></div>
-                                <div className="text-center w-1/2">
-                                    <span className={metrics.coc >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(metrics.coc) ? metrics.coc.toFixed(1) + '%' : '—'}</span>
-                                    <span className="block text-xs font-normal text-slate-500">Moved Out</span>
-                                </div>
-                            </div>
-                        </KpiCard>
-                    </>
-                ) : (
-                    <>
-                        <KpiCard label="Cash Flow / mo" value={metrics.cf} isPositive={metrics.cf > 0} isNegative={metrics.cf < 0} />
-                        <KpiCard label="Cash-on-Cash" value={`${isFinite(metrics.coc) ? metrics.coc.toFixed(1) + '%' : '—'}`} />
-                    </>
-                )}
-            </div>
-            <p className="text-xs text-slate-500 mt-2">Cash to Close = down + CC (+ reno if not financed). CoC uses Cash to Close. PM/Maint/CapEx are % of total rent.</p>
+          )}
         </div>
-    );
+        <button
+          onClick={() => onExportPdf(CALCULATOR_ID, 'ByTheRoom_Analysis', ACTIONS_CLASS)}
+          className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm"
+        >
+          Export PDF
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SectionHeader>The Purchase</SectionHeader>
+        <InputField label="Purchase" id="rm_purchase" value={data.purchase} onChange={e => onChange('purchase', e.target.value)} min={50000} max={1500000} step={1000} />
+        <InputField
+          label="Down Payment (%)"
+          id="rm_down_pct"
+          value={data.downPct}
+          onChange={e => onChange('downPct', e.target.value)}
+          min={0}
+          max={100}
+          step={0.25}
+          secondaryInput={{ label: 'or Down $', id: 'rm_down_amt', value: data.downAmt, onChange: e => onChange('downAmt', e.target.value) }}
+        />
+        <InputField label="Closing Costs ($)" id="rm_cc" value={data.cc} onChange={e => onChange('cc', e.target.value)} min={0} max={50000} step={100} infoText={`CC = ${metrics.ccPct} of price`} />
+        <div className="col-span-1 md:col-span-2 text-xs text-slate-500 -mt-2">
+          {data.renoFinanced ? (
+            <span>
+              Loan Amount = {money(metrics.purchaseLoan)} (purchase) + {money(data.renovation)} (reno) = <span className="font-semibold">{money(metrics.loan)}</span>
+            </span>
+          ) : (
+            <span>
+              Loan Amount = <span className="font-semibold">{money(metrics.loan)}</span>
+            </span>
+          )}
+        </div>
+
+        <SectionHeader>The Loan</SectionHeader>
+        <InputField label="Rate %" id="rm_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
+        <InputField label="Term" id="rm_term" value={data.term} onChange={e => onChange('term', e.target.value)} min={1} max={40} step={1} />
+
+        <SectionHeader>Renovation</SectionHeader>
+        <InputField
+          label="Renovation ($)"
+          id="rm_renovation"
+          value={data.renovation}
+          onChange={e => onChange('renovation', e.target.value)}
+          min={0}
+          max={200000}
+          step={500}
+          checkboxOption={{ label: 'Finance into loan', checked: data.renoFinanced, onChange: e => onCheckboxChange('renoFinanced', e.target.checked) }}
+        />
+
+        <SectionHeader>Operating Expenses</SectionHeader>
+        <InputField
+          label="Taxes (annual $ / rate)"
+          id="rm_tax_yr"
+          value={data.taxYr}
+          onChange={e => onChange('taxYr', e.target.value)}
+          min={0}
+          max={20000}
+          step={50}
+          secondaryInput={{ id: 'rm_tax_rate', value: data.taxRate, onChange: e => onChange('taxRate', e.target.value), min: 0, max: 5, step: 0.01 }}
+          infoText="When you change either side, the other updates based on price."
+          isPaired={true}
+        />
+        <InputField label="Insurance ($/mo)" id="rm_ins_mo" value={data.insMo} onChange={e => onChange('insMo', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.insMo * 12)}/yr`} />
+        <InputField label="HOA ($/mo)" id="rm_hoa" value={data.hoa} onChange={e => onChange('hoa', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.hoa * 12)}/yr`} />
+        <InputField label="Utilities ($/mo)" id="rm_utilities" value={data.utilities} onChange={e => onChange('utilities', e.target.value)} min={0} max={1000} step={10} infoText={`= ${money(data.utilities * 12)}/yr`} />
+        <InputField label="PM (% of rent)" id="rm_pm_pct" value={data.pmPct} onChange={e => onChange('pmPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.pmMonthly)}/mo | ${money(metrics.pmMonthly * 12)}/yr`} />
+        <InputField label="Maintenance (% of rent)" id="rm_maint_pct" value={data.maintPct} onChange={e => onChange('maintPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.maintMonthly)}/mo | ${money(metrics.maintMonthly * 12)}/yr`} />
+        <InputField label="CapEx (% of rent)" id="rm_capex_pct" value={data.capexPct} onChange={e => onChange('capexPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.capexMonthly)}/mo | ${money(metrics.capexMonthly * 12)}/yr`} />
+      </div>
+
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-2 pb-1 border-b">
+          <h3 className="font-bold text-md">Revenue</h3>
+          <div className="flex gap-2">
+            <button onClick={() => addRentalUnit('Room')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">
+              Add Room
+            </button>
+            <button onClick={() => addRentalUnit('ADU')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">
+              Add ADU
+            </button>
+            <button onClick={() => addRentalUnit('Unit')} className="py-2 px-3 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-xs">
+              Add Unit
+            </button>
+          </div>
+        </div>
+        <div className="mt-2 space-y-3">
+          {rentalUnits.map(unit => {
+            currentCounts[unit.type] += 1;
+            const unitLabel = `${unit.type} ${currentCounts[unit.type]} Rent`;
+            return (
+              <div key={unit.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start sm:items-center">
+                <InputField label={unitLabel} id={unit.id} value={unit.rent} onChange={e => updateRentalUnitRent(unit.id, e.target.value)} min={0} max={3000} step={25} />
+                <div className="flex justify-end items-center gap-4 h-full">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input type="checkbox" checked={unit.ownerOccupied} onChange={() => setOwnerOccupiedUnit(unit.id)} className="h-4 w-4 rounded border-gray-300 text-slate-600 focus:ring-slate-500 cursor-pointer" />
+                    Owner Occupied
+                  </label>
+                  <button onClick={() => removeRentalUnit(unit.id)} className="py-2 px-4 rounded-full font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors duration-200 text-sm">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-4 pt-2 border-t text-right">
+          {ownerOccupiedUnit ? (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-bold">Rent (Living In):</span>
+                <span className="ml-2">{money(metrics.totalRentLivingIn)}/mo</span>
+              </div>
+              <div>
+                <span className="font-bold">Rent (Moved Out):</span>
+                <span className="ml-2">{money(metrics.totalRentMovedOut)}/mo</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm">
+              <span className="font-bold">Total Monthly Rent:</span>
+              <span className="ml-2">{money(metrics.totalRentMovedOut)}/mo</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <NewConstructionRider idPrefix="room" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
+      {rider.enabled && rider.showBeforeAfter && (
+        <div className="mt-4">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Before vs After</h3>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ownerOccupiedUnit ? (
+              <>
+                <KpiCard label="Before CF (Living In)" value={metrics.cfLivingIn} isPositive={metrics.cfLivingIn > 0} isNegative={metrics.cfLivingIn < 0} />
+                <KpiCard label="After CF (Living In)" value={finalLivingIn.cashFlow} isPositive={finalLivingIn.cashFlow > 0} isNegative={finalLivingIn.cashFlow < 0} />
+                <KpiCard label="Before CoC (Living In)" value={`${isFinite(metrics.cocLivingIn) ? metrics.cocLivingIn.toFixed(1) + '%' : 'N/A'}`} />
+                <KpiCard label="After CoC (Living In)" value={`${isFinite(finalLivingIn.coc) ? finalLivingIn.coc.toFixed(1) + '%' : 'N/A'}`} />
+                <KpiCard label="Before CF (Moved Out)" value={metrics.cf} isPositive={metrics.cf > 0} isNegative={metrics.cf < 0} />
+                <KpiCard label="After CF (Moved Out)" value={finalMovedOut.cashFlow} isPositive={finalMovedOut.cashFlow > 0} isNegative={finalMovedOut.cashFlow < 0} />
+              </>
+            ) : (
+              <>
+                <KpiCard label="Before CF / mo" value={metrics.cf} isPositive={metrics.cf > 0} isNegative={metrics.cf < 0} />
+                <KpiCard label="After CF / mo" value={finalMovedOut.cashFlow} isPositive={finalMovedOut.cashFlow > 0} isNegative={finalMovedOut.cashFlow < 0} />
+                <KpiCard label="Before CoC" value={`${isFinite(metrics.coc) ? metrics.coc.toFixed(1) + '%' : 'N/A'}`} />
+                <KpiCard label="After CoC" value={`${isFinite(finalMovedOut.coc) ? finalMovedOut.coc.toFixed(1) + '%' : 'N/A'}`} />
+                <KpiCard label="Before Cash to Close" value={metrics.cashIn} />
+                <KpiCard label="After Cash to Close" value={finalMovedOut.cashIn} />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+      {rider.enabled && rider.showProjectOnly && (
+        <div className="mt-4">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">New Construction Only</h3>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiCard label="Project Revenue / mo" value={riderImpact.monthlyRevenue} />
+            <KpiCard label="Project Opex / mo" value={riderImpact.monthlyOpex} />
+            <KpiCard label="Project Debt / mo" value={riderImpact.monthlyDebtService} />
+            <KpiCard label="Project CF / mo" value={riderImpact.projectCashFlow} isPositive={riderImpact.projectCashFlow > 0} isNegative={riderImpact.projectCashFlow < 0} />
+          </div>
+        </div>
+      )}
+
+      <hr className="my-4" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <KpiCard label="Loan Amount" value={metrics.loan} />
+        <KpiCard label="Cash to Close" value={finalMovedOut.cashIn} />
+        <KpiCard label="PITI / mo" value={finalMovedOut.piti} />
+        <KpiCard label="Opex / mo" value={ownerOccupiedUnit ? money(finalLivingIn.opex) : finalMovedOut.opex} />
+
+        {ownerOccupiedUnit ? (
+          <>
+            <KpiCard label="Cash Flow / mo">
+              <div className="flex justify-around items-center text-base">
+                <div className="text-center w-1/2">
+                  <span className={finalLivingIn.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>{money(finalLivingIn.cashFlow)}</span>
+                  <span className="block text-xs font-normal text-slate-500">Living In</span>
+                </div>
+                <div className="border-l border-slate-300 h-6"></div>
+                <div className="text-center w-1/2">
+                  <span className={finalMovedOut.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>{money(finalMovedOut.cashFlow)}</span>
+                  <span className="block text-xs font-normal text-slate-500">Moved Out</span>
+                </div>
+              </div>
+            </KpiCard>
+            <KpiCard label="Cash-on-Cash">
+              <div className="flex justify-around items-center text-base">
+                <div className="text-center w-1/2">
+                  <span className={finalLivingIn.coc >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(finalLivingIn.coc) ? `${finalLivingIn.coc.toFixed(1)}%` : 'N/A'}</span>
+                  <span className="block text-xs font-normal text-slate-500">Living In</span>
+                </div>
+                <div className="border-l border-slate-300 h-6"></div>
+                <div className="text-center w-1/2">
+                  <span className={finalMovedOut.coc >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(finalMovedOut.coc) ? `${finalMovedOut.coc.toFixed(1)}%` : 'N/A'}</span>
+                  <span className="block text-xs font-normal text-slate-500">Moved Out</span>
+                </div>
+              </div>
+            </KpiCard>
+          </>
+        ) : (
+          <>
+            <KpiCard label="Cash Flow / mo" value={finalMovedOut.cashFlow} isPositive={finalMovedOut.cashFlow > 0} isNegative={finalMovedOut.cashFlow < 0} />
+            <KpiCard label="Cash-on-Cash" value={`${isFinite(finalMovedOut.coc) ? finalMovedOut.coc.toFixed(1) + '%' : 'N/A'}`} />
+          </>
+        )}
+      </div>
+      <p className="text-xs text-slate-500 mt-2">Cash to Close = down + CC (+ reno if not financed). PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
+    </div>
+  );
 };
 
 export default RoomCalculator;

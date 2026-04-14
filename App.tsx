@@ -10,6 +10,7 @@ import DscrCalculator from './components/DscrCalculator';
 import BuildCalculator from './components/BuildCalculator';
 import MultiUnitCalculator from './components/MultiUnitCalculator';
 import { num } from './utils/calculators';
+import { exportElementToPdf } from './utils/pdfExport';
 
 // TYPE DEFINITIONS
 interface BasePropertyData {
@@ -418,37 +419,19 @@ const App: React.FC = () => {
     // New Handlers for Export and Data Push
     const handleExportPdf = useCallback(async (elementId: string, filename: string, actionsClass: string) => {
         const element = document.getElementById(elementId);
-        if (element) {
-            // Apply export mode class
-            element.classList.add('export-mode');
-            
-            const actions = element.querySelector(`.${actionsClass}`);
-            const originalDisplay = actions ? (actions as HTMLElement).style.display : '';
-            if (actions) (actions as HTMLElement).style.display = 'none';
-
-            const opt = {
-                margin: [0.5, 0.5],
-                filename: `${filename}_${new Date().toISOString().slice(0, 10)}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                  scale: 2, 
-                  useCORS: true,
-                  logging: false,
-                  letterRendering: true
-                },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            
-            try {
-              // @ts-ignore
-              await html2pdf().set(opt).from(element).save();
-            } finally {
-              // Cleanup: restore display and remove class
-              if (actions) (actions as HTMLElement).style.display = originalDisplay;
-              element.classList.remove('export-mode');
-            }
-        } else {
+        if (!element) {
             console.error('Could not find element to export:', elementId);
+            return;
+        }
+
+        try {
+            await exportElementToPdf({
+                sourceElement: element,
+                filename: `${filename}_${new Date().toISOString().slice(0, 10)}.pdf`,
+                actionsClass
+            });
+        } catch (error) {
+            console.error('PDF export failed:', error);
         }
     }, []);
 
@@ -482,25 +465,25 @@ const App: React.FC = () => {
 
         switch (destination) {
             case 'ltr':
-                setLtrData(prev => ({ ...prev, ...baseData, rent: rent || prev.rent }));
+                setLtrData(prev => ({ ...prev, ...baseData, rent: rent ?? prev.rent }));
                 break;
             case 'room':
-                setRoomData(prev => ({ ...prev, ...baseData, pmPct: baseData.pmPct || prev.pmPct }));
+                setRoomData(prev => ({ ...prev, ...baseData, pmPct: baseData.pmPct ?? prev.pmPct }));
                 break;
             case 'str':
-                setStrData(prev => ({ ...prev, ...baseData, adr: adr || prev.adr, occ: occ || prev.occ }));
+                setStrData(prev => ({ ...prev, ...baseData, adr: adr ?? prev.adr, occ: occ ?? prev.occ }));
                 break;
             case 'multi':
                 setMultiUnitData(prev => ({ ...prev, ...baseData }));
                 break;
             case 'dscr':
                 setDscrData(prev => ({
-                    ...prev, purchase: baseData.purchase || prev.purchase, downPct: baseData.downPct || prev.downPct, downAmt: baseData.downAmt || prev.downAmt,
-                    cc: baseData.cc || prev.cc, renovation: baseData.renovation || prev.renovation, rate: baseData.rate || prev.rate, term: baseData.term || prev.term,
-                    taxYr: baseData.taxYr || prev.taxYr, taxRate: baseData.taxRate || prev.taxRate, insMo: baseData.insMo || prev.insMo, hoa: baseData.hoa || prev.hoa,
-                    ltr_rent: rent || prev.ltr_rent, str_adr: adr || prev.str_adr, str_occ: occ || prev.str_occ,
-                    inv_utilities: baseData.utilities || prev.inv_utilities, inv_pmPct: baseData.pmPct || prev.inv_pmPct,
-                    inv_maintPct: baseData.maintPct || prev.inv_maintPct, inv_capexPct: baseData.capexPct || prev.inv_capexPct,
+                    ...prev, purchase: baseData.purchase ?? prev.purchase, downPct: baseData.downPct ?? prev.downPct, downAmt: baseData.downAmt ?? prev.downAmt,
+                    cc: baseData.cc ?? prev.cc, renovation: baseData.renovation ?? prev.renovation, rate: baseData.rate ?? prev.rate, term: baseData.term ?? prev.term,
+                    taxYr: baseData.taxYr ?? prev.taxYr, taxRate: baseData.taxRate ?? prev.taxRate, insMo: baseData.insMo ?? prev.insMo, hoa: baseData.hoa ?? prev.hoa,
+                    ltr_rent: rent ?? prev.ltr_rent, str_adr: adr ?? prev.str_adr, str_occ: occ ?? prev.str_occ,
+                    inv_utilities: baseData.utilities ?? prev.inv_utilities, inv_pmPct: baseData.pmPct ?? prev.inv_pmPct,
+                    inv_maintPct: baseData.maintPct ?? prev.inv_maintPct, inv_capexPct: baseData.capexPct ?? prev.inv_capexPct,
                 }));
                 break;
         }

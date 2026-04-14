@@ -18,9 +18,14 @@
         background: white !important;
       }
 
-      .export-mode input[type="range"],
-      .export-mode .html2pdf__page-break {
+      .export-mode input[type="range"] {
         display: none !important;
+      }
+
+      .export-mode .html2pdf__page-break {
+        display: block !important;
+        break-before: page !important;
+        page-break-before: always !important;
       }
 
       .export-mode input[type="text"],
@@ -44,7 +49,7 @@
 
       .export-mode .border-slate-300,
       .export-mode .border-slate-200 {
-        border-color: #f1f5f9 !important; /* slate-100 */
+        border-color: #cbd5e1 !important; /* slate-300 */
       }
 
       .export-mode button,
@@ -60,6 +65,12 @@
       .export-mode .rounded-xl,
       .export-mode .rounded-2xl {
         border-radius: 0 !important;
+      }
+
+      .export-mode,
+      .export-mode * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
     </style>
   <script type="importmap">
