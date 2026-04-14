@@ -12,7 +12,7 @@ export const loanAmt = (price: number, downPct: number): number => {
 export const pmt = (loan: number, ratePct: number, years: number): number => {
     const r = ratePct / 100 / 12;
     const n = years * 12;
-    if (r === 0) return loan / n;
     if (n === 0 || loan === 0) return 0;
+    if (r === 0) return loan / n;
     return loan * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
 };
