@@ -156,6 +156,9 @@ const StrCalculator: React.FC<StrCalculatorProps> = ({ data, onChange, onCheckbo
             </span>
           )}
         </div>
+        <div className="col-span-1 md:col-span-2">
+          <SellerCreditModule idPrefix="str" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+        </div>
 
         <SectionHeader>The Loan</SectionHeader>
         <InputField label="Rate %" id="str_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
@@ -212,7 +215,6 @@ const StrCalculator: React.FC<StrCalculatorProps> = ({ data, onChange, onCheckbo
         <InputField label="Avg Stays / mo" id="str_stays" value={data.stays} onChange={e => onChange('stays', e.target.value)} min={0} max={20} step={1} />
       </div>
 
-      <SellerCreditModule idPrefix="str" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <NewConstructionRider idPrefix="str" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
@@ -243,7 +245,6 @@ const StrCalculator: React.FC<StrCalculatorProps> = ({ data, onChange, onCheckbo
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMetrics.cashIn} />
-        <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMetrics.piti} />
         <KpiCard label="Opex / mo" value={finalMetrics.opex} />
         <KpiCard label="Cash Flow / mo" value={finalMetrics.cashFlow} isPositive={finalMetrics.cashFlow > 0} isNegative={finalMetrics.cashFlow < 0} />

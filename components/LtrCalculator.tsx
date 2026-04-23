@@ -164,6 +164,9 @@ const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckbo
             </span>
           )}
         </div>
+        <div className="col-span-1 md:col-span-2">
+          <SellerCreditModule idPrefix="ltr" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+        </div>
 
         <SectionHeader>The Loan</SectionHeader>
         <InputField label="Rate (%)" id="ltr_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
@@ -203,7 +206,6 @@ const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckbo
         <InputField label="CapEx (% of rent)" id="ltr_capex_pct" value={data.capexPct} onChange={e => onChange('capexPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.capexMonthly)}/mo | ${money(metrics.capexMonthly * 12)}/yr`} />
       </div>
 
-      <SellerCreditModule idPrefix="ltr" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <NewConstructionRider idPrefix="ltr" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
@@ -234,7 +236,6 @@ const LtrCalculator: React.FC<LtrCalculatorProps> = ({ data, onChange, onCheckbo
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMetrics.cashIn} />
-        <KpiCard label="Est. Note Rate" value={`${metrics.effectiveRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMetrics.piti} />
         <KpiCard label="Opex / mo" value={finalMetrics.opex} />
         <KpiCard label="Cash Flow / mo" value={finalMetrics.cashFlow} isPositive={finalMetrics.cashFlow > 0} isNegative={finalMetrics.cashFlow < 0} />

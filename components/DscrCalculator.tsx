@@ -373,7 +373,6 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         <hr className="my-4" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard label="Net Operating Income (NOI)" value={`${money(lenderAdjusted.noi / 12)}/mo`} />
-          <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
           <KpiCard label="Cash Flow">
             {data.renoFinancedHM ? (
               <div className="flex justify-around items-center text-base">
@@ -477,7 +476,6 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <KpiCard label="Loan Amount" value={investorMetrics.loan} />
           <KpiCard label="Cash to Close" value={investorAdjusted.cashIn} />
-          <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
           <KpiCard label="PITI / mo" value={investorAdjusted.piti} />
           <KpiCard label="Opex / mo" value={investorAdjusted.opex} />
 

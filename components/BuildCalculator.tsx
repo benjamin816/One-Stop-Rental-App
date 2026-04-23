@@ -273,7 +273,6 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <KpiCard label="Total Project Cost" value={metrics.totalProjectCost} />
                 <KpiCard label="Upfront Cash for Construction" value={metrics.upfrontCashForConstruction} />
-                <KpiCard label="Est. Refi Rate" value={`${metrics.effectiveRefiRate.toFixed(3)}%`} />
                 <KpiCard label="Cash Out/(In) at Refi" value={metrics.cashOutAtRefi} isPositive={metrics.cashOutAtRefi > 0} isNegative={metrics.cashOutAtRefi < 0} />
                 <KpiCard label="Net Cash Invested" value={metrics.netCashInvested} />
                 <KpiCard label="Total Revenue / mo" value={metrics.totalRevenue} />

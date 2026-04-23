@@ -153,36 +153,36 @@ export interface MultiUnitData extends Omit<BasePropertyData, 'maintPct' | 'cape
 const initialLtrData: LtrData = {
     purchase: 350000, downPct: 20, downAmt: 70000, cc: 10500, renoFinanced: false, renovation: 15000,
     rate: 6.5, term: 30, rent: 2800, taxYr: 4200, taxRate: 1.2, insMo: 125, hoa: 0, utilities: 0,
-    pmPct: 8, maintPct: 5, capexPct: 5,
+    pmPct: 8, maintPct: 3, capexPct: 3,
 };
 
 const initialRoomData: RoomData = {
     purchase: 450000, downPct: 5, downAmt: 22500, cc: 13500, renoFinanced: false, renovation: 20000,
     rate: 6.0, term: 30, taxYr: 5400, taxRate: 1.2, insMo: 150, hoa: 50, utilities: 400,
-    pmPct: 0, maintPct: 5, capexPct: 5,
+    pmPct: 0, maintPct: 3, capexPct: 3,
 };
 
 const initialStrData: StrData = {
     purchase: 400000, downPct: 25, downAmt: 100000, cc: 12000, renoFinanced: false, renovation: 25000, staging: 15000,
     rate: 7.0, term: 30, adr: 250, occ: 75, taxYr: 4800, taxRate: 1.2, insMo: 200, hoa: 100, utilities: 500,
-    suppliesMo: 150, cohostPct: 15, platformPct: 3, maintPct: 5, capexPct: 5, clean: 150, stays: 8,
+    suppliesMo: 150, cohostPct: 15, platformPct: 3, maintPct: 3, capexPct: 3, clean: 150, stays: 8,
 };
 
 const initialDscrData: DscrData = {
     propertyType: 'LTR', purchase: 500000, downPct: 25, downAmt: 125000, cc: 15000, rate: 7.5, term: 30, renovation: 0, renoFinancedHM: false, hm_rate: 12, hm_term: 1,
     ltr_rent: 4000, str_adr: 300, str_occ: 70, taxYr: 6000, taxRate: 1.2, insMo: 175, hoa: 0, stress_vacancy: 5, stress_rate: 9.5, min_dscr: 1.0,
-    inv_pmPct: 15, inv_maintPct: 5, inv_capexPct: 5, inv_utilities: 300, inv_platformPct: 3, inv_suppliesMo: 150, inv_clean: 0, inv_stays: 8,
+    inv_pmPct: 15, inv_maintPct: 3, inv_capexPct: 3, inv_utilities: 300, inv_platformPct: 3, inv_suppliesMo: 150, inv_clean: 0, inv_stays: 8,
 };
 
 const initialBuildData: BuildData = {
     propertyType: 'SFH', landAcquisition: 'cash', landCost: 100000, hardCosts: 400000, softCosts: 50000, buffer: 50000, closingCosts: 20000, construction_ltc: 80, construction_rate: 9.5, construction_term: 12,
-    arv: 750000, refi_ltv: 75, refi_rate: 6.8, refi_term: 30, total_taxYr: 9000, total_taxRate: 1.2, total_insYr: 2100, maintPct: 5, capexPct: 5, total_hoa: 0, total_utilities: 0, applyToAll: false,
+    arv: 750000, refi_ltv: 75, refi_rate: 6.8, refi_term: 30, total_taxYr: 9000, total_taxRate: 1.2, total_insYr: 2100, maintPct: 3, capexPct: 3, total_hoa: 0, total_utilities: 0, applyToAll: false,
 };
 
 const initialMultiUnitData: MultiUnitData = {
     purchase: 600000, downPct: 25, downAmt: 150000, cc: 18000, renoFinanced: false, renovation: 30000,
     rate: 7.2, term: 30, taxYr: 7200, taxRate: 1.2, insMo: 250, hoa: 0, utilities: 0,
-    pmPct: 8, maintPct: 5, capexPct: 5,
+    pmPct: 8, maintPct: 3, capexPct: 3,
 };
 
 const Tab: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (

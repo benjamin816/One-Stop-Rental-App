@@ -157,6 +157,9 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
             </span>
           )}
         </div>
+        <div className="col-span-1 md:col-span-2">
+          <SellerCreditModule idPrefix="multi" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+        </div>
 
         <SectionHeader>The Loan</SectionHeader>
         <InputField label="Rate %" id="mu_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
@@ -224,7 +227,6 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
         </div>
       </div>
 
-      <SellerCreditModule idPrefix="multi" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <NewConstructionRider idPrefix="multi" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
@@ -255,7 +257,6 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMetrics.cashIn} />
-        <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMetrics.piti} />
         <KpiCard label="Opex / mo" value={finalMetrics.opex} />
         <KpiCard label="Cash Flow / mo" value={finalMetrics.cashFlow} isPositive={finalMetrics.cashFlow > 0} isNegative={finalMetrics.cashFlow < 0} />

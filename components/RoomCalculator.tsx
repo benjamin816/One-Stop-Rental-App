@@ -201,6 +201,9 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
             </span>
           )}
         </div>
+        <div className="col-span-1 md:col-span-2">
+          <SellerCreditModule idPrefix="room" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+        </div>
 
         <SectionHeader>The Loan</SectionHeader>
         <InputField label="Rate %" id="rm_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
@@ -239,7 +242,6 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
         <InputField label="CapEx (% of rent)" id="rm_capex_pct" value={data.capexPct} onChange={e => onChange('capexPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.capexMonthly)}/mo | ${money(metrics.capexMonthly * 12)}/yr`} />
       </div>
 
-      <SellerCreditModule idPrefix="room" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <div className="mt-6">
         <div className="flex items-center justify-between mb-2 pb-1 border-b">
           <h3 className="font-bold text-md">Revenue</h3>
@@ -339,7 +341,6 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMovedOut.cashIn} />
-        <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMovedOut.piti} />
         <KpiCard label="Opex / mo" value={ownerOccupiedUnit ? money(finalLivingIn.opex) : finalMovedOut.opex} />
 
