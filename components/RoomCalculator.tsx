@@ -2,12 +2,17 @@ import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import NewConstructionRider from './NewConstructionRider';
+import SellerCreditModule from './SellerCreditModule';
 import { pmt, loanAmt, money } from '../utils/calculators';
 import {
   applyRiderToCoreMetrics,
   defaultNewConstructionRiderState,
   getNewConstructionRiderImpact
 } from '../utils/newConstructionRider';
+import {
+  defaultSellerCreditState,
+  getSellerCreditResult
+} from '../utils/sellerCredit';
 import type { RoomData, RentalUnit, CalculatorType } from '../App';
 
 interface RoomCalculatorProps {
@@ -50,7 +55,25 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
 }) => {
   const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
   const [rider, setRider] = useState(defaultNewConstructionRiderState);
+  const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
   const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
+  const purchaseLoan = useMemo(() => loanAmt(data.purchase, data.downPct), [data.purchase, data.downPct]);
+  const loan = useMemo(() => (data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan), [data.renoFinanced, data.renovation, purchaseLoan]);
+  const baseCashToClose = useMemo(
+    () => (data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation),
+    [data.renoFinanced, data.downAmt, data.cc, data.renovation]
+  );
+  const sellerCreditResult = useMemo(
+    () => getSellerCreditResult({
+      state: sellerCredit,
+      isFinanced: loan > 0,
+      totalClosingCosts: data.cc,
+      loanAmount: loan,
+      baseInterestRate: data.rate,
+      baseCashToClose
+    }),
+    [sellerCredit, loan, data.cc, data.rate, baseCashToClose]
+  );
 
   const metrics = useMemo(() => {
     const ownerOccupiedUnit = rentalUnits.find(u => u.ownerOccupied);
@@ -58,11 +81,10 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
     const totalRentMovedOut = rentalUnits.reduce((acc, unit) => acc + unit.rent, 0);
     const totalRentLivingIn = ownerOccupiedUnit ? totalRentMovedOut - ownerOccupiedUnit.rent : totalRentMovedOut;
 
-    const purchaseLoan = loanAmt(data.purchase, data.downPct);
-    const loan = data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan;
-    const pi = pmt(loan, data.rate, data.term);
+    const effectiveRate = sellerCreditResult.estimatedNewRate;
+    const pi = pmt(loan, effectiveRate, data.term);
     const piti = pi + data.taxYr / 12 + data.insMo;
-    const cashIn = data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation;
+    const cashIn = sellerCreditResult.adjustedCashToClose;
     const ccPct = data.purchase > 0 ? `${(data.cc / data.purchase * 100).toFixed(2)}%` : 'N/A';
 
     const opexMovedOut = data.hoa + data.utilities + totalRentMovedOut * (data.pmPct + data.maintPct + data.capexPct) / 100;
@@ -96,7 +118,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
       cfLivingIn,
       cocLivingIn
     };
-  }, [data, rentalUnits]);
+  }, [data, rentalUnits, loan, purchaseLoan, sellerCreditResult]);
 
   const riderImpact = useMemo(() => getNewConstructionRiderImpact(rider, riderAssumptions), [rider, riderAssumptions]);
   const finalMovedOut = useMemo(
@@ -217,6 +239,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
         <InputField label="CapEx (% of rent)" id="rm_capex_pct" value={data.capexPct} onChange={e => onChange('capexPct', e.target.value)} min={0} max={20} step={0.5} infoText={`${money(metrics.capexMonthly)}/mo | ${money(metrics.capexMonthly * 12)}/yr`} />
       </div>
 
+      <SellerCreditModule idPrefix="room" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <div className="mt-6">
         <div className="flex items-center justify-between mb-2 pb-1 border-b">
           <h3 className="font-bold text-md">Revenue</h3>
@@ -316,6 +339,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMovedOut.cashIn} />
+        <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMovedOut.piti} />
         <KpiCard label="Opex / mo" value={ownerOccupiedUnit ? money(finalLivingIn.opex) : finalMovedOut.opex} />
 
@@ -355,7 +379,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           </>
         )}
       </div>
-      <p className="text-xs text-slate-500 mt-2">Cash to Close = down + CC (+ reno if not financed). PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
+      <p className="text-xs text-slate-500 mt-2">Cash to Close and payment outputs include Seller Credit adjustments. PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
     </div>
   );
 };

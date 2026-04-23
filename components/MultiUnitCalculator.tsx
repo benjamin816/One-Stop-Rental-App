@@ -2,12 +2,17 @@ import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import NewConstructionRider from './NewConstructionRider';
+import SellerCreditModule from './SellerCreditModule';
 import { pmt, loanAmt, money } from '../utils/calculators';
 import {
   applyRiderToCoreMetrics,
   defaultNewConstructionRiderState,
   getNewConstructionRiderImpact
 } from '../utils/newConstructionRider';
+import {
+  defaultSellerCreditState,
+  getSellerCreditResult
+} from '../utils/sellerCredit';
 import type { MultiUnitData, MultiUnitItem, CalculatorType } from '../App';
 
 interface MultiUnitCalculatorProps {
@@ -38,16 +43,33 @@ const calculatorNames: Record<CalculatorType, string> = {
 const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, onChange, onCheckboxChange, addUnit, removeUnit, updateUnitRent, onPushData, onExportPdf }) => {
   const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
   const [rider, setRider] = useState(defaultNewConstructionRiderState);
+  const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
   const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
+  const purchaseLoan = useMemo(() => loanAmt(data.purchase, data.downPct), [data.purchase, data.downPct]);
+  const loan = useMemo(() => (data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan), [data.renoFinanced, data.renovation, purchaseLoan]);
+  const baseCashToClose = useMemo(
+    () => (data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation),
+    [data.renoFinanced, data.downAmt, data.cc, data.renovation]
+  );
+  const sellerCreditResult = useMemo(
+    () => getSellerCreditResult({
+      state: sellerCredit,
+      isFinanced: loan > 0,
+      totalClosingCosts: data.cc,
+      loanAmount: loan,
+      baseInterestRate: data.rate,
+      baseCashToClose
+    }),
+    [sellerCredit, loan, data.cc, data.rate, baseCashToClose]
+  );
 
   const metrics = useMemo(() => {
     const totalRent = units.reduce((acc, unit) => acc + unit.rent, 0);
 
-    const purchaseLoan = loanAmt(data.purchase, data.downPct);
-    const loan = data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan;
-    const pi = pmt(loan, data.rate, data.term);
+    const effectiveRate = sellerCreditResult.estimatedNewRate;
+    const pi = pmt(loan, effectiveRate, data.term);
     const piti = pi + data.taxYr / 12 + data.insMo;
-    const cashIn = data.renoFinanced ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation;
+    const cashIn = sellerCreditResult.adjustedCashToClose;
     const ccPct = data.purchase > 0 ? `${(data.cc / data.purchase * 100).toFixed(2)}%` : 'N/A';
 
     const opex = data.hoa + data.utilities + totalRent * (data.pmPct + data.maintPct + data.capexPct) / 100;
@@ -59,7 +81,7 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
     const capexMonthly = totalRent * (data.capexPct / 100);
 
     return { loan, pi, piti, cashIn, ccPct, pmMonthly, maintMonthly, capexMonthly, purchaseLoan, opex, cf, coc, totalRent };
-  }, [data, units]);
+  }, [data, units, loan, purchaseLoan, sellerCreditResult]);
 
   const riderImpact = useMemo(() => getNewConstructionRiderImpact(rider, riderAssumptions), [rider, riderAssumptions]);
   const finalMetrics = useMemo(
@@ -202,6 +224,7 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
         </div>
       </div>
 
+      <SellerCreditModule idPrefix="multi" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
       <NewConstructionRider idPrefix="multi" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
@@ -232,12 +255,13 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMetrics.cashIn} />
+        <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
         <KpiCard label="PITI / mo" value={finalMetrics.piti} />
         <KpiCard label="Opex / mo" value={finalMetrics.opex} />
         <KpiCard label="Cash Flow / mo" value={finalMetrics.cashFlow} isPositive={finalMetrics.cashFlow > 0} isNegative={finalMetrics.cashFlow < 0} />
         <KpiCard label="Cash-on-Cash" value={`${isFinite(finalMetrics.coc) ? finalMetrics.coc.toFixed(1) + '%' : 'N/A'}`} />
       </div>
-      <p className="text-xs text-slate-500 mt-2">Cash to Close = down + CC (+ reno if not financed). PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
+      <p className="text-xs text-slate-500 mt-2">Cash to Close and payment outputs include Seller Credit adjustments. PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
     </div>
   );
 };

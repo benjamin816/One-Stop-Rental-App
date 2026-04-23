@@ -3,7 +3,12 @@
 import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
+import SellerCreditModule from './SellerCreditModule';
 import { pmt, money } from '../utils/calculators';
+import {
+    defaultSellerCreditState,
+    getSellerCreditResult
+} from '../utils/sellerCredit';
 import type { BuildData, BuildUnitData, PropertyType, LandAcquisition, UnitStrategy, CalculatorType } from '../App';
 
 interface BuildCalculatorProps {
@@ -87,24 +92,47 @@ const calculatorNames: Record<CalculatorType, string> = {
 
 const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataChange, onPropTypeChange, onUnitChange, onUnitCheckboxChange, onUnitStrategyChange, onApplyAllChange, onPushData, onExportPdf }) => {
     const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
-    
-    const metrics = useMemo(() => {
+    const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
+
+    const buildCore = useMemo(() => {
         let loanableCostBase = data.hardCosts + data.softCosts + data.buffer;
         if (data.landAcquisition === 'finance') {
             loanableCostBase += data.landCost;
         }
 
         const constructionLoanAmt = loanableCostBase * (data.construction_ltc / 100);
+        const totalProjectCost = (data.landAcquisition !== 'owned' ? data.landCost : 0) + data.hardCosts + data.softCosts + data.buffer + data.closingCosts;
+        const upfrontCashBeforeCredit = totalProjectCost - constructionLoanAmt;
+        const permanentLoanAmt = data.arv * (data.refi_ltv / 100);
+
+        return { constructionLoanAmt, totalProjectCost, upfrontCashBeforeCredit, permanentLoanAmt };
+    }, [data]);
+
+    const sellerCreditResult = useMemo(
+        () => getSellerCreditResult({
+            state: sellerCredit,
+            isFinanced: buildCore.permanentLoanAmt > 0,
+            totalClosingCosts: data.closingCosts,
+            loanAmount: buildCore.permanentLoanAmt,
+            baseInterestRate: data.refi_rate,
+            baseCashToClose: buildCore.upfrontCashBeforeCredit
+        }),
+        [sellerCredit, buildCore, data.closingCosts, data.refi_rate]
+    );
+    
+    const metrics = useMemo(() => {
+        const constructionLoanAmt = buildCore.constructionLoanAmt;
         const constructionPayment = (constructionLoanAmt * (data.construction_rate / 100)) / 12;
 
-        const totalProjectCost = (data.landAcquisition !== 'owned' ? data.landCost : 0) + data.hardCosts + data.softCosts + data.buffer;
-        const upfrontCashForConstruction = totalProjectCost - constructionLoanAmt;
+        const totalProjectCost = buildCore.totalProjectCost;
+        const upfrontCashForConstruction = sellerCreditResult.adjustedCashToClose;
         
-        const permanentLoanAmt = data.arv * (data.refi_ltv / 100);
+        const permanentLoanAmt = buildCore.permanentLoanAmt;
         const cashOutAtRefi = permanentLoanAmt - constructionLoanAmt;
         const netCashInvested = upfrontCashForConstruction - cashOutAtRefi;
 
-        const pi = pmt(permanentLoanAmt, data.refi_rate, data.refi_term);
+        const effectiveRefiRate = sellerCreditResult.estimatedNewRate;
+        const pi = pmt(permanentLoanAmt, effectiveRefiRate, data.refi_term);
         const piti = pi + data.total_taxYr / 12 + data.total_insYr / 12;
 
         const { totalRevenue, totalUnitOpex } = units.reduce((acc, unit) => {
@@ -140,8 +168,8 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
         }
         ltcInfoText += ` = ${money(constructionLoanAmt)}`;
 
-        return { totalProjectCost, constructionLoanAmt, constructionPayment, upfrontCashForConstruction, permanentLoanAmt, cashOutAtRefi, netCashInvested, pi, piti, totalRevenue, totalOpex, stabilizedCf, coc, returnOnCost, ltcInfoText };
-    }, [data, units]);
+        return { totalProjectCost, constructionLoanAmt, constructionPayment, upfrontCashForConstruction, permanentLoanAmt, cashOutAtRefi, netCashInvested, pi, piti, totalRevenue, totalOpex, stabilizedCf, coc, returnOnCost, ltcInfoText, effectiveRefiRate };
+    }, [data, units, buildCore, sellerCreditResult]);
     
     const maintMonthly = (metrics.totalRevenue * data.maintPct) / 100;
     const capexMonthly = (metrics.totalRevenue * data.capexPct) / 100;
@@ -199,6 +227,7 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 <InputField label="Hard Costs ($)" id="build_hard" value={data.hardCosts} onChange={e => onDataChange('hardCosts', e.target.value)} min={0} max={2000000} step={10000} />
                 <InputField label="Soft Costs ($)" id="build_soft" value={data.softCosts} onChange={e => onDataChange('softCosts', e.target.value)} min={0} max={500000} step={2500} infoText="Covers: permits, architectural plans, engineering, impact fees, etc." />
                 <InputField label="Buffer / Contingency ($)" id="build_buffer" value={data.buffer} onChange={e => onDataChange('buffer', e.target.value)} min={0} max={250000} step={2500} />
+                <InputField label="Estimated Closing Costs ($)" id="build_closing_costs" value={data.closingCosts} onChange={e => onDataChange('closingCosts', e.target.value)} min={0} max={100000} step={500} />
                 <InputField label="Construction Loan LTC (%)" id="build_ltc" value={data.construction_ltc} onChange={e => onDataChange('construction_ltc', e.target.value)} min={50} max={90} step={1} infoText={metrics.ltcInfoText} />
                 <InputField label="Construction Rate (%)" id="build_loan_rate" value={data.construction_rate} onChange={e => onDataChange('construction_rate', e.target.value)} min={5} max={15} step={0.1} />
                 <InputField label="Construction Term (months)" id="build_loan_term" value={data.construction_term} onChange={e => onDataChange('construction_term', e.target.value)} min={6} max={24} step={1} />
@@ -206,6 +235,8 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                     <span className="font-bold">Est. Construction Financing Payment:</span> {money(metrics.constructionPayment)}/mo (Interest Only)
                 </div>
             </div>
+
+            <SellerCreditModule idPrefix="build" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
 
             <SectionHeader>Permanent Financing (Refinance)</SectionHeader>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -242,6 +273,7 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <KpiCard label="Total Project Cost" value={metrics.totalProjectCost} />
                 <KpiCard label="Upfront Cash for Construction" value={metrics.upfrontCashForConstruction} />
+                <KpiCard label="Est. Refi Rate" value={`${metrics.effectiveRefiRate.toFixed(3)}%`} />
                 <KpiCard label="Cash Out/(In) at Refi" value={metrics.cashOutAtRefi} isPositive={metrics.cashOutAtRefi > 0} isNegative={metrics.cashOutAtRefi < 0} />
                 <KpiCard label="Net Cash Invested" value={metrics.netCashInvested} />
                 <KpiCard label="Total Revenue / mo" value={metrics.totalRevenue} />
@@ -250,7 +282,7 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 <KpiCard label="Stabilized CF / mo" value={metrics.stabilizedCf} isPositive={metrics.stabilizedCf > 0} isNegative={metrics.stabilizedCf < 0} />
                 <KpiCard label="Cash-on-Cash Return" value={`${isFinite(metrics.coc) ? metrics.coc.toFixed(1) + '%' : '—'}`} />
             </div>
-             <p className="text-xs text-slate-500 mt-2">All calculations are based on the stabilized property after refinancing into permanent debt. CoC is based on Net Cash Invested.</p>
+             <p className="text-xs text-slate-500 mt-2">All calculations are based on the stabilized property after refinancing into permanent debt. Seller Credit updates closing costs, adjusted cash to close, and estimated refinance rate.</p>
         </div>
     );
 };

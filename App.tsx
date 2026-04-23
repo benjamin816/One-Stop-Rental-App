@@ -105,6 +105,7 @@ export interface BuildData {
     hardCosts: number;
     softCosts: number;
     buffer: number;
+    closingCosts: number;
     construction_ltc: number;
     construction_rate: number;
     construction_term: number;
@@ -174,7 +175,7 @@ const initialDscrData: DscrData = {
 };
 
 const initialBuildData: BuildData = {
-    propertyType: 'SFH', landAcquisition: 'cash', landCost: 100000, hardCosts: 400000, softCosts: 50000, buffer: 50000, construction_ltc: 80, construction_rate: 9.5, construction_term: 12,
+    propertyType: 'SFH', landAcquisition: 'cash', landCost: 100000, hardCosts: 400000, softCosts: 50000, buffer: 50000, closingCosts: 20000, construction_ltc: 80, construction_rate: 9.5, construction_term: 12,
     arv: 750000, refi_ltv: 75, refi_rate: 6.8, refi_term: 30, total_taxYr: 9000, total_taxRate: 1.2, total_insYr: 2100, maintPct: 5, capexPct: 5, total_hoa: 0, total_utilities: 0, applyToAll: false,
 };
 

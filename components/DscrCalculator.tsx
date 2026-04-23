@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import NewConstructionRider from './NewConstructionRider';
+import SellerCreditModule from './SellerCreditModule';
 import { pmt, loanAmt, money } from '../utils/calculators';
 import { exportElementToPdf } from '../utils/pdfExport';
 import {
@@ -9,6 +10,10 @@ import {
   defaultNewConstructionRiderState,
   getNewConstructionRiderImpact
 } from '../utils/newConstructionRider';
+import {
+  defaultSellerCreditState,
+  getSellerCreditResult
+} from '../utils/sellerCredit';
 import type { DscrData, CalculatorType } from '../App';
 
 interface DscrCalculatorProps {
@@ -46,8 +51,25 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isStressTestDisabled, setIsStressTestDisabled] = useState(true);
   const [rider, setRider] = useState(defaultNewConstructionRiderState);
+  const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
 
   const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
+  const dscrLoanAmount = useMemo(() => loanAmt(data.purchase, data.downPct), [data.purchase, data.downPct]);
+  const dscrBaseCashToClose = useMemo(
+    () => (data.renoFinancedHM ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation),
+    [data.renoFinancedHM, data.downAmt, data.cc, data.renovation]
+  );
+  const sellerCreditResult = useMemo(
+    () => getSellerCreditResult({
+      state: sellerCredit,
+      isFinanced: dscrLoanAmount > 0,
+      totalClosingCosts: data.cc,
+      loanAmount: dscrLoanAmount,
+      baseInterestRate: data.rate,
+      baseCashToClose: dscrBaseCashToClose
+    }),
+    [sellerCredit, dscrLoanAmount, data.cc, data.rate, dscrBaseCashToClose]
+  );
 
   useEffect(() => {
     if (data.propertyType === 'LTR') {
@@ -67,7 +89,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
   }, [data.rate]);
 
   const lenderMetrics = useMemo(() => {
-    const loan = loanAmt(data.purchase, data.downPct);
+    const loan = dscrLoanAmount;
     const grossMonthlyIncome = data.propertyType === 'LTR'
       ? data.ltr_rent
       : data.str_adr * (30.44 * (data.str_occ / 100));
@@ -77,7 +99,8 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
     const lenderOpex = data.taxYr + (data.insMo * 12) + (data.hoa * 12);
     const noi = effectiveGrossIncome - lenderOpex;
 
-    const effectiveStressRate = isStressTestDisabled ? data.rate : data.stress_rate;
+    const stressedRateAfterBuydown = Math.max(data.stress_rate - sellerCreditResult.estimatedRateReduction, 0);
+    const effectiveStressRate = isStressTestDisabled ? sellerCreditResult.estimatedNewRate : stressedRateAfterBuydown;
     const primaryDebtService = pmt(loan, effectiveStressRate, data.term) * 12;
 
     const hmPayment = data.renoFinancedHM ? pmt(data.renovation, data.hm_rate, data.hm_term) : 0;
@@ -100,13 +123,13 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
       cashFlowAnnual,
       cashFlowAfterHmAnnual
     };
-  }, [data, isStressTestDisabled]);
+  }, [data, isStressTestDisabled, dscrLoanAmount, sellerCreditResult]);
 
   const investorMetrics = useMemo(() => {
-    const loan = loanAmt(data.purchase, data.downPct);
+    const loan = dscrLoanAmount;
     const grossMonthlyIncome = lenderMetrics.grossMonthlyIncome;
     const hmPayment = lenderMetrics.hmPayment;
-    const pi = pmt(loan, data.rate, data.term);
+    const pi = pmt(loan, sellerCreditResult.estimatedNewRate, data.term);
     const piti = pi + data.taxYr / 12 + data.insMo;
 
     let opex = 0;
@@ -122,7 +145,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
 
     const cfWithHm = grossMonthlyIncome - piti - opex - hmPayment;
     const cfAfterHm = grossMonthlyIncome - piti - opex;
-    const cashIn = data.renoFinancedHM ? data.downAmt + data.cc : data.downAmt + data.cc + data.renovation;
+    const cashIn = sellerCreditResult.adjustedCashToClose;
     const cocWithHm = cashIn > 0 ? (cfWithHm * 12) / cashIn * 100 : 0;
     const cocAfterHm = cashIn > 0 ? (cfAfterHm * 12) / cashIn * 100 : 0;
     const pmMonthly = grossMonthlyIncome * (data.inv_pmPct / 100);
@@ -130,7 +153,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
     const capexMonthly = grossMonthlyIncome * (data.inv_capexPct / 100);
 
     return { loan, piti, opex, cfWithHm, cfAfterHm, cashIn, cocWithHm, cocAfterHm, pmMonthly, maintMonthly, capexMonthly };
-  }, [data, lenderMetrics]);
+  }, [data, lenderMetrics, dscrLoanAmount, sellerCreditResult]);
 
   const riderImpact = useMemo(() => getNewConstructionRiderImpact(rider, riderAssumptions), [rider, riderAssumptions]);
 
@@ -259,6 +282,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         <button onClick={() => setActiveSubTab('lender')} className={`py-2 px-4 font-bold ${activeSubTab === 'lender' ? 'border-b-2 border-slate-800' : 'text-slate-500'}`}>Lender Facing</button>
         <button onClick={() => setActiveSubTab('investor')} className={`py-2 px-4 font-bold ${activeSubTab === 'investor' ? 'border-b-2 border-slate-800' : 'text-slate-500'}`}>Investor Facing</button>
       </div>
+      <SellerCreditModule idPrefix="dscr" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
 
       <div id="dscr-lender-view" style={{ display: activeSubTab === 'lender' ? 'block' : 'none' }}>
         <div className="flex justify-center gap-4 mb-4 p-2 rounded-lg bg-slate-100">
@@ -349,6 +373,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         <hr className="my-4" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard label="Net Operating Income (NOI)" value={`${money(lenderAdjusted.noi / 12)}/mo`} />
+          <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
           <KpiCard label="Cash Flow">
             {data.renoFinancedHM ? (
               <div className="flex justify-around items-center text-base">
@@ -452,6 +477,7 @@ const DscrCalculator: React.FC<DscrCalculatorProps> = ({ data, onChange, onCheck
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <KpiCard label="Loan Amount" value={investorMetrics.loan} />
           <KpiCard label="Cash to Close" value={investorAdjusted.cashIn} />
+          <KpiCard label="Est. Note Rate" value={`${sellerCreditResult.estimatedNewRate.toFixed(3)}%`} />
           <KpiCard label="PITI / mo" value={investorAdjusted.piti} />
           <KpiCard label="Opex / mo" value={investorAdjusted.opex} />
 
