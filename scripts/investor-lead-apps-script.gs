@@ -100,7 +100,7 @@ function doPost(e) {
 function investorResponse_(result, origin) {
   const target = INVESTOR_ALLOWED_ORIGINS.indexOf(origin) === -1 ? INVESTOR_ALLOWED_ORIGINS[0] : origin;
   const message = JSON.stringify({ type: 'investor-lead-result', ...result }).replace(/</g, '\\u003c');
-  return HtmlService.createHtmlOutput('<!doctype html><html><body><script>window.parent.postMessage(' + message + ',' + JSON.stringify(target) + ');</script></body></html>')
+  return HtmlService.createHtmlOutput('<!doctype html><html><body><script>window.top.postMessage(' + message + ',' + JSON.stringify(target) + ');</script></body></html>')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 

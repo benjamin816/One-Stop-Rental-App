@@ -23,7 +23,6 @@ const InvestorLeadGate: React.FC = () => {
   const [wantsContact, setWantsContact] = useState(false);
   const [consent, setConsent] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingId = useRef('');
   const timeoutRef = useRef<number | null>(null);
 
@@ -31,7 +30,6 @@ const InvestorLeadGate: React.FC = () => {
     if (unlocked) return;
     const onMessage = (event: MessageEvent<LeadResult>) => {
       // Apps Script serves HtmlService responses from Google's content domain.
-      if (event.source !== iframeRef.current?.contentWindow) return;
       if (!/^https:\/\/[a-z0-9.-]*googleusercontent\.com$/i.test(event.origin)) return;
       if (event.data?.type !== 'investor-lead-result' || event.data.submissionId !== pendingId.current) return;
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
@@ -119,7 +117,7 @@ const InvestorLeadGate: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[#152b1a]/80 p-4 backdrop-blur-sm" role="presentation">
-      <iframe ref={iframeRef} title="Lead form response" name="investor-lead-response" className="hidden" />
+      <iframe title="Lead form response" name="investor-lead-response" className="hidden" />
       <section role="dialog" aria-modal="true" aria-labelledby="investor-gate-title" className="my-auto w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="bg-[#2F5233] px-6 py-6 text-center text-white sm:px-10">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#E9CC77]">Raleigh NC Guide</p>
