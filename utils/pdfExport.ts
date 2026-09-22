@@ -43,6 +43,27 @@ export const exportElementToPdf = async ({
 
   const cleanupCallbacks: Array<() => void> = [];
 
+  sourceElement.querySelectorAll('[data-seller-credit-module="true"][data-enabled="false"]').forEach(node => {
+    const element = node as HTMLElement;
+    const originalDisplay = element.style.display;
+    element.style.display = 'none';
+    cleanupCallbacks.push(() => {
+      element.style.display = originalDisplay;
+    });
+  });
+
+  sourceElement.querySelectorAll('input[type="checkbox"]').forEach(node => {
+    const checkbox = node as HTMLInputElement;
+    const label = checkbox.closest('label') as HTMLElement | null;
+    if (!label || checkbox.checked) return;
+
+    const originalDisplay = label.style.display;
+    label.style.display = 'none';
+    cleanupCallbacks.push(() => {
+      label.style.display = originalDisplay;
+    });
+  });
+
   if (actionsClass) {
     sourceElement.querySelectorAll(`.${actionsClass}`).forEach(node => {
       const element = node as HTMLElement;

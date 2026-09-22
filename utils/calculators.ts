@@ -1,5 +1,13 @@
 export const num = (v: any): number => parseFloat(String(v).replace(/[^0-9.-]/g, '')) || 0;
 
+export const roundTo = (value: number, decimals = 2): number => {
+    if (!isFinite(value)) return 0;
+    const factor = Math.pow(10, decimals);
+    return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
+export const round2 = (value: number): number => roundTo(value, 2);
+
 export const money = (n: number): string => {
     if (!isFinite(n) || n === 0) return '$0';
     return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });

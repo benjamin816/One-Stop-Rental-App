@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+.codex-investor-sheet/
 dist-ssr
 *.local
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import InputField from './InputField';
-import { money, num } from '../utils/calculators';
+import { money, num, round2, roundTo } from '../utils/calculators';
 import { getNewConstructionRiderImpact } from '../utils/newConstructionRider';
 import type {
   NewConstructionRiderAssumptions,
@@ -43,7 +43,8 @@ const NewConstructionRider: React.FC<NewConstructionRiderProps> = ({ idPrefix, r
       | 'separateRate'
       | 'separateTerm'
   ) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...rider, [field]: num(event.target.value) });
+    const decimals = field === 'separateRate' ? 3 : 2;
+    onChange({ ...rider, [field]: decimals === 3 ? roundTo(num(event.target.value), 3) : round2(num(event.target.value)) });
   };
 
   const updateToggle = (
@@ -152,7 +153,7 @@ const NewConstructionRider: React.FC<NewConstructionRiderProps> = ({ idPrefix, r
             {rider.financingMode === 'separate_loan' && (
               <>
                 <InputField label="Separate Loan DP (%)" id={`${idPrefix}_nc_sep_dp`} value={rider.separateDownPct} onChange={updateNumber('separateDownPct')} min={0} max={100} step={0.5} />
-                <InputField label="Separate Loan Rate (%)" id={`${idPrefix}_nc_sep_rate`} value={rider.separateRate} onChange={updateNumber('separateRate')} min={0} max={20} step={0.05} />
+                <InputField label="Separate Loan Rate (%)" id={`${idPrefix}_nc_sep_rate`} value={rider.separateRate} onChange={updateNumber('separateRate')} min={0} max={20} step={0.001} decimalPlaces={3} />
                 <InputField label="Separate Loan Term (yrs)" id={`${idPrefix}_nc_sep_term`} value={rider.separateTerm} onChange={updateNumber('separateTerm')} min={1} max={40} step={1} />
               </>
             )}

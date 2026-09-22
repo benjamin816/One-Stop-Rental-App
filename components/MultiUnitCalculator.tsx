@@ -3,21 +3,27 @@ import InputField from './InputField';
 import KpiCard from './KpiCard';
 import NewConstructionRider from './NewConstructionRider';
 import SellerCreditModule from './SellerCreditModule';
+import LoanTypeSelector from './LoanTypeSelector';
+import PayoffAnalysis from './PayoffAnalysis';
 import { pmt, loanAmt, money } from '../utils/calculators';
 import {
   applyRiderToCoreMetrics,
-  defaultNewConstructionRiderState,
   getNewConstructionRiderImpact
 } from '../utils/newConstructionRider';
 import {
-  defaultSellerCreditState,
   getSellerCreditResult
 } from '../utils/sellerCredit';
 import type { MultiUnitData, MultiUnitItem, CalculatorType } from '../App';
+import type { NewConstructionRiderState } from '../utils/newConstructionRider';
+import type { SellerCreditState } from '../utils/sellerCredit';
 
 interface MultiUnitCalculatorProps {
   data: MultiUnitData;
   units: MultiUnitItem[];
+  rider: NewConstructionRiderState;
+  sellerCredit: SellerCreditState;
+  onRiderChange: (next: NewConstructionRiderState) => void;
+  onSellerCreditChange: (next: SellerCreditState) => void;
   onChange: (field: keyof MultiUnitData, value: string) => void;
   onCheckboxChange: (field: keyof MultiUnitData, checked: boolean) => void;
   addUnit: () => void;
@@ -25,6 +31,8 @@ interface MultiUnitCalculatorProps {
   updateUnitRent: (id: string, rent: string) => void;
   onPushData: (source: CalculatorType, destination: CalculatorType) => void;
   onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
+  showSaveButton: boolean;
+  onSave: () => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -40,11 +48,10 @@ const calculatorNames: Record<CalculatorType, string> = {
   dscr: 'DSCR Loan'
 };
 
-const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, onChange, onCheckboxChange, addUnit, removeUnit, updateUnitRent, onPushData, onExportPdf }) => {
+const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, rider, sellerCredit, onRiderChange, onSellerCreditChange, onChange, onCheckboxChange, addUnit, removeUnit, updateUnitRent, onPushData, onExportPdf, showSaveButton, onSave }) => {
   const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
-  const [rider, setRider] = useState(defaultNewConstructionRiderState);
-  const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
   const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
+  const refiRiderAssumptions = useMemo(() => ({ existingLoanRate: data.refiRate, existingLoanTerm: data.term }), [data.refiRate, data.term]);
   const purchaseLoan = useMemo(() => loanAmt(data.purchase, data.downPct), [data.purchase, data.downPct]);
   const loan = useMemo(() => (data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan), [data.renoFinanced, data.renovation, purchaseLoan]);
   const baseCashToClose = useMemo(
@@ -67,20 +74,25 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
     const totalRent = units.reduce((acc, unit) => acc + unit.rent, 0);
 
     const effectiveRate = sellerCreditResult.estimatedNewRate;
+    const taxesAndInsurance = data.taxYr / 12 + data.insMo;
     const pi = pmt(loan, effectiveRate, data.term);
-    const piti = pi + data.taxYr / 12 + data.insMo;
+    const piti = pi + taxesAndInsurance;
+    const refiPi = pmt(loan, data.refiRate, data.term);
+    const refiPiti = refiPi + taxesAndInsurance;
     const cashIn = sellerCreditResult.adjustedCashToClose;
     const ccPct = data.purchase > 0 ? `${(data.cc / data.purchase * 100).toFixed(2)}%` : 'N/A';
 
     const opex = data.hoa + data.utilities + totalRent * (data.pmPct + data.maintPct + data.capexPct) / 100;
     const cf = totalRent - piti - opex;
+    const refiCf = totalRent - refiPiti - opex;
     const coc = cashIn > 0 ? (cf * 12) / cashIn * 100 : 0;
+    const refiCoc = cashIn > 0 ? (refiCf * 12) / cashIn * 100 : 0;
 
     const pmMonthly = totalRent * (data.pmPct / 100);
     const maintMonthly = totalRent * (data.maintPct / 100);
     const capexMonthly = totalRent * (data.capexPct / 100);
 
-    return { loan, pi, piti, cashIn, ccPct, pmMonthly, maintMonthly, capexMonthly, purchaseLoan, opex, cf, coc, totalRent };
+    return { loan, pi, piti, cashIn, ccPct, pmMonthly, maintMonthly, capexMonthly, purchaseLoan, opex, cf, coc, totalRent, taxesAndInsurance, refiPiti, refiCf, refiCoc };
   }, [data, units, loan, purchaseLoan, sellerCreditResult]);
 
   const riderImpact = useMemo(() => getNewConstructionRiderImpact(rider, riderAssumptions), [rider, riderAssumptions]);
@@ -88,6 +100,12 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
     () => applyRiderToCoreMetrics({ piti: metrics.piti, opex: metrics.opex, cashFlow: metrics.cf, cashIn: metrics.cashIn }, rider, riderAssumptions),
     [metrics, rider, riderAssumptions]
   );
+  const refiFinalMetrics = useMemo(
+    () => applyRiderToCoreMetrics({ piti: metrics.refiPiti, opex: metrics.opex, cashFlow: metrics.refiCf, cashIn: metrics.cashIn }, rider, refiRiderAssumptions),
+    [metrics, rider, refiRiderAssumptions]
+  );
+  const payoffRevenue = metrics.totalRent + (rider.enabled ? riderImpact.monthlyRevenue : 0);
+  const payoffOpex = metrics.opex + (rider.enabled ? riderImpact.monthlyOpex : 0);
 
   const CALCULATOR_ID = 'multi-calculator';
   const ACTIONS_CLASS = 'multi-actions';
@@ -130,6 +148,14 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
         >
           Export PDF
         </button>
+        {showSaveButton && (
+          <button
+            onClick={onSave}
+            className="py-2 px-4 rounded-full font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors duration-200 text-sm"
+          >
+            Save
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -142,7 +168,7 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
           onChange={e => onChange('downPct', e.target.value)}
           min={0}
           max={100}
-          step={0.25}
+          step={0.01}
           secondaryInput={{ label: 'or Down $', id: 'mu_down_amt', value: data.downAmt, onChange: e => onChange('downAmt', e.target.value) }}
         />
         <InputField label="Closing Costs ($)" id="mu_cc" value={data.cc} onChange={e => onChange('cc', e.target.value)} min={0} max={100000} step={500} infoText={`CC = ${metrics.ccPct} of price`} />
@@ -158,12 +184,21 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
           )}
         </div>
         <div className="col-span-1 md:col-span-2">
-          <SellerCreditModule idPrefix="multi" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+          <SellerCreditModule idPrefix="multi" state={sellerCredit} result={sellerCreditResult} onChange={onSellerCreditChange} />
         </div>
 
         <SectionHeader>The Loan</SectionHeader>
-        <InputField label="Rate %" id="mu_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
+        <InputField label="Rate %" id="mu_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.001} decimalPlaces={3} />
         <InputField label="Term" id="mu_term" value={data.term} onChange={e => onChange('term', e.target.value)} min={1} max={40} step={1} />
+        <LoanTypeSelector
+          idPrefix="multi"
+          loanType={data.loanType}
+          armType={data.armType}
+          refiRate={data.refiRate}
+          onLoanTypeChange={value => onChange('loanType', value)}
+          onArmTypeChange={value => onChange('armType', value)}
+          onRefiRateChange={value => onChange('refiRate', value)}
+        />
 
         <SectionHeader>Renovation</SectionHeader>
         <InputField
@@ -187,7 +222,6 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
           max={100000}
           step={100}
           secondaryInput={{ id: 'mu_tax_rate', value: data.taxRate, onChange: e => onChange('taxRate', e.target.value), min: 0, max: 5, step: 0.01 }}
-          infoText="When you change either side, the other updates based on price."
           isPaired={true}
         />
         <InputField label="Insurance ($/mo)" id="mu_ins_mo" value={data.insMo} onChange={e => onChange('insMo', e.target.value)} min={0} max={2000} step={10} infoText={`= ${money(data.insMo * 12)}/yr`} />
@@ -227,7 +261,7 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
         </div>
       </div>
 
-      <NewConstructionRider idPrefix="multi" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
+      <NewConstructionRider idPrefix="multi" rider={rider} assumptions={riderAssumptions} onChange={onRiderChange} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
           <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Before vs After</h3>
@@ -252,8 +286,19 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
           </div>
         </div>
       )}
+      <PayoffAnalysis
+        enabled={data.payoffEnabled}
+        onToggle={checked => onCheckboxChange('payoffEnabled', checked)}
+        monthlyRevenue={payoffRevenue}
+        monthlyTaxesAndInsurance={metrics.taxesAndInsurance}
+        monthlyOpex={payoffOpex}
+        note="Shows paid-off multi-unit cash flow while keeping taxes, insurance, operating expenses, and enabled rider operations included."
+      />
 
       <hr className="my-4" />
+      {data.loanType === 'arm' && (
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Initial ARM Period ({data.armType})</h3>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMetrics.cashIn} />
@@ -262,6 +307,19 @@ const MultiUnitCalculator: React.FC<MultiUnitCalculatorProps> = ({ data, units, 
         <KpiCard label="Cash Flow / mo" value={finalMetrics.cashFlow} isPositive={finalMetrics.cashFlow > 0} isNegative={finalMetrics.cashFlow < 0} />
         <KpiCard label="Cash-on-Cash" value={`${isFinite(finalMetrics.coc) ? finalMetrics.coc.toFixed(1) + '%' : 'N/A'}`} />
       </div>
+      {data.loanType === 'arm' && (
+        <div className="mt-5">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">After Refinance at {data.refiRate}%</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <KpiCard label="Loan Amount" value={metrics.loan} />
+            <KpiCard label="Cash to Close" value={refiFinalMetrics.cashIn} />
+            <KpiCard label="PITI / mo" value={refiFinalMetrics.piti} />
+            <KpiCard label="Opex / mo" value={refiFinalMetrics.opex} />
+            <KpiCard label="Cash Flow / mo" value={refiFinalMetrics.cashFlow} isPositive={refiFinalMetrics.cashFlow > 0} isNegative={refiFinalMetrics.cashFlow < 0} />
+            <KpiCard label="Cash-on-Cash" value={`${isFinite(refiFinalMetrics.coc) ? refiFinalMetrics.coc.toFixed(1) + '%' : 'N/A'}`} />
+          </div>
+        </div>
+      )}
       <p className="text-xs text-slate-500 mt-2">Cash to Close and payment outputs include Seller Credit adjustments. PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
     </div>
   );

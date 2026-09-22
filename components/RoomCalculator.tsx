@@ -3,20 +3,26 @@ import InputField from './InputField';
 import KpiCard from './KpiCard';
 import NewConstructionRider from './NewConstructionRider';
 import SellerCreditModule from './SellerCreditModule';
+import LoanTypeSelector from './LoanTypeSelector';
+import PayoffAnalysis from './PayoffAnalysis';
 import { pmt, loanAmt, money } from '../utils/calculators';
 import {
   applyRiderToCoreMetrics,
-  defaultNewConstructionRiderState,
   getNewConstructionRiderImpact
 } from '../utils/newConstructionRider';
 import {
-  defaultSellerCreditState,
   getSellerCreditResult
 } from '../utils/sellerCredit';
 import type { RoomData, RentalUnit, CalculatorType } from '../App';
+import type { NewConstructionRiderState } from '../utils/newConstructionRider';
+import type { SellerCreditState } from '../utils/sellerCredit';
 
 interface RoomCalculatorProps {
   data: RoomData;
+  rider: NewConstructionRiderState;
+  sellerCredit: SellerCreditState;
+  onRiderChange: (next: NewConstructionRiderState) => void;
+  onSellerCreditChange: (next: SellerCreditState) => void;
   onChange: (field: keyof RoomData, value: string) => void;
   onCheckboxChange: (field: keyof RoomData, checked: boolean) => void;
   rentalUnits: RentalUnit[];
@@ -26,6 +32,8 @@ interface RoomCalculatorProps {
   setOwnerOccupiedUnit: (id: string) => void;
   onPushData: (source: CalculatorType, destination: CalculatorType) => void;
   onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
+  showSaveButton: boolean;
+  onSave: () => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -43,6 +51,10 @@ const calculatorNames: Record<CalculatorType, string> = {
 
 const RoomCalculator: React.FC<RoomCalculatorProps> = ({
   data,
+  rider,
+  sellerCredit,
+  onRiderChange,
+  onSellerCreditChange,
   onChange,
   onCheckboxChange,
   rentalUnits,
@@ -51,12 +63,13 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
   updateRentalUnitRent,
   setOwnerOccupiedUnit,
   onPushData,
-  onExportPdf
+  onExportPdf,
+  showSaveButton,
+  onSave
 }) => {
   const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
-  const [rider, setRider] = useState(defaultNewConstructionRiderState);
-  const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
   const riderAssumptions = useMemo(() => ({ existingLoanRate: data.rate, existingLoanTerm: data.term }), [data.rate, data.term]);
+  const refiRiderAssumptions = useMemo(() => ({ existingLoanRate: data.refiRate, existingLoanTerm: data.term }), [data.refiRate, data.term]);
   const purchaseLoan = useMemo(() => loanAmt(data.purchase, data.downPct), [data.purchase, data.downPct]);
   const loan = useMemo(() => (data.renoFinanced ? purchaseLoan + data.renovation : purchaseLoan), [data.renoFinanced, data.renovation, purchaseLoan]);
   const baseCashToClose = useMemo(
@@ -82,18 +95,25 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
     const totalRentLivingIn = ownerOccupiedUnit ? totalRentMovedOut - ownerOccupiedUnit.rent : totalRentMovedOut;
 
     const effectiveRate = sellerCreditResult.estimatedNewRate;
+    const taxesAndInsurance = data.taxYr / 12 + data.insMo;
     const pi = pmt(loan, effectiveRate, data.term);
-    const piti = pi + data.taxYr / 12 + data.insMo;
+    const piti = pi + taxesAndInsurance;
+    const refiPi = pmt(loan, data.refiRate, data.term);
+    const refiPiti = refiPi + taxesAndInsurance;
     const cashIn = sellerCreditResult.adjustedCashToClose;
     const ccPct = data.purchase > 0 ? `${(data.cc / data.purchase * 100).toFixed(2)}%` : 'N/A';
 
     const opexMovedOut = data.hoa + data.utilities + totalRentMovedOut * (data.pmPct + data.maintPct + data.capexPct) / 100;
     const cfMovedOut = totalRentMovedOut - piti - opexMovedOut;
+    const refiCfMovedOut = totalRentMovedOut - refiPiti - opexMovedOut;
     const cocMovedOut = cashIn > 0 ? (cfMovedOut * 12) / cashIn * 100 : 0;
+    const refiCocMovedOut = cashIn > 0 ? (refiCfMovedOut * 12) / cashIn * 100 : 0;
 
     const opexLivingIn = data.hoa + data.utilities + totalRentLivingIn * (data.pmPct + data.maintPct + data.capexPct) / 100;
     const cfLivingIn = totalRentLivingIn - piti - opexLivingIn;
+    const refiCfLivingIn = totalRentLivingIn - refiPiti - opexLivingIn;
     const cocLivingIn = cashIn > 0 ? (cfLivingIn * 12) / cashIn * 100 : 0;
+    const refiCocLivingIn = cashIn > 0 ? (refiCfLivingIn * 12) / cashIn * 100 : 0;
 
     const pmMonthly = totalRentMovedOut * (data.pmPct / 100);
     const maintMonthly = totalRentMovedOut * (data.maintPct / 100);
@@ -116,7 +136,13 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
       totalRentMovedOut,
       opexLivingIn,
       cfLivingIn,
-      cocLivingIn
+      cocLivingIn,
+      taxesAndInsurance,
+      refiPiti,
+      refiCfMovedOut,
+      refiCocMovedOut,
+      refiCfLivingIn,
+      refiCocLivingIn
     };
   }, [data, rentalUnits, loan, purchaseLoan, sellerCreditResult]);
 
@@ -129,8 +155,18 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
     () => applyRiderToCoreMetrics({ piti: metrics.piti, opex: metrics.opexLivingIn, cashFlow: metrics.cfLivingIn, cashIn: metrics.cashIn }, rider, riderAssumptions),
     [metrics, rider, riderAssumptions]
   );
+  const refiFinalMovedOut = useMemo(
+    () => applyRiderToCoreMetrics({ piti: metrics.refiPiti, opex: metrics.opex, cashFlow: metrics.refiCfMovedOut, cashIn: metrics.cashIn }, rider, refiRiderAssumptions),
+    [metrics, rider, refiRiderAssumptions]
+  );
+  const refiFinalLivingIn = useMemo(
+    () => applyRiderToCoreMetrics({ piti: metrics.refiPiti, opex: metrics.opexLivingIn, cashFlow: metrics.refiCfLivingIn, cashIn: metrics.cashIn }, rider, refiRiderAssumptions),
+    [metrics, rider, refiRiderAssumptions]
+  );
 
   const ownerOccupiedUnit = rentalUnits.find(r => r.ownerOccupied);
+  const payoffRevenue = (ownerOccupiedUnit ? metrics.totalRentLivingIn : metrics.totalRentMovedOut) + (rider.enabled ? riderImpact.monthlyRevenue : 0);
+  const payoffOpex = (ownerOccupiedUnit ? metrics.opexLivingIn : metrics.opex) + (rider.enabled ? riderImpact.monthlyOpex : 0);
   let currentCounts: Record<'Room' | 'ADU' | 'Unit', number> = { Room: 0, ADU: 0, Unit: 0 };
 
   const CALCULATOR_ID = 'room-calculator';
@@ -174,6 +210,14 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
         >
           Export PDF
         </button>
+        {showSaveButton && (
+          <button
+            onClick={onSave}
+            className="py-2 px-4 rounded-full font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors duration-200 text-sm"
+          >
+            Save
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -186,7 +230,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           onChange={e => onChange('downPct', e.target.value)}
           min={0}
           max={100}
-          step={0.25}
+          step={0.01}
           secondaryInput={{ label: 'or Down $', id: 'rm_down_amt', value: data.downAmt, onChange: e => onChange('downAmt', e.target.value) }}
         />
         <InputField label="Closing Costs ($)" id="rm_cc" value={data.cc} onChange={e => onChange('cc', e.target.value)} min={0} max={50000} step={100} infoText={`CC = ${metrics.ccPct} of price`} />
@@ -202,12 +246,21 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           )}
         </div>
         <div className="col-span-1 md:col-span-2">
-          <SellerCreditModule idPrefix="room" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
+          <SellerCreditModule idPrefix="room" state={sellerCredit} result={sellerCreditResult} onChange={onSellerCreditChange} />
         </div>
 
         <SectionHeader>The Loan</SectionHeader>
-        <InputField label="Rate %" id="rm_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.05} />
+        <InputField label="Rate %" id="rm_rate" value={data.rate} onChange={e => onChange('rate', e.target.value)} min={0} max={15} step={0.001} decimalPlaces={3} />
         <InputField label="Term" id="rm_term" value={data.term} onChange={e => onChange('term', e.target.value)} min={1} max={40} step={1} />
+        <LoanTypeSelector
+          idPrefix="room"
+          loanType={data.loanType}
+          armType={data.armType}
+          refiRate={data.refiRate}
+          onLoanTypeChange={value => onChange('loanType', value)}
+          onArmTypeChange={value => onChange('armType', value)}
+          onRefiRateChange={value => onChange('refiRate', value)}
+        />
 
         <SectionHeader>Renovation</SectionHeader>
         <InputField
@@ -231,7 +284,6 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           max={20000}
           step={50}
           secondaryInput={{ id: 'rm_tax_rate', value: data.taxRate, onChange: e => onChange('taxRate', e.target.value), min: 0, max: 5, step: 0.01 }}
-          infoText="When you change either side, the other updates based on price."
           isPaired={true}
         />
         <InputField label="Insurance ($/mo)" id="rm_ins_mo" value={data.insMo} onChange={e => onChange('insMo', e.target.value)} min={0} max={1000} step={5} infoText={`= ${money(data.insMo * 12)}/yr`} />
@@ -298,7 +350,7 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
         </div>
       </div>
 
-      <NewConstructionRider idPrefix="room" rider={rider} assumptions={riderAssumptions} onChange={setRider} />
+      <NewConstructionRider idPrefix="room" rider={rider} assumptions={riderAssumptions} onChange={onRiderChange} />
       {rider.enabled && rider.showBeforeAfter && (
         <div className="mt-4">
           <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Before vs After</h3>
@@ -336,8 +388,19 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           </div>
         </div>
       )}
+      <PayoffAnalysis
+        enabled={data.payoffEnabled}
+        onToggle={checked => onCheckboxChange('payoffEnabled', checked)}
+        monthlyRevenue={payoffRevenue}
+        monthlyTaxesAndInsurance={metrics.taxesAndInsurance}
+        monthlyOpex={payoffOpex}
+        note={ownerOccupiedUnit ? 'Uses the Living In rent scenario because an owner-occupied unit is selected.' : 'Uses the Moved Out rent scenario because no owner-occupied unit is selected.'}
+      />
 
       <hr className="my-4" />
+      {data.loanType === 'arm' && (
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Initial ARM Period ({data.armType})</h3>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <KpiCard label="Loan Amount" value={metrics.loan} />
         <KpiCard label="Cash to Close" value={finalMovedOut.cashIn} />
@@ -380,6 +443,52 @@ const RoomCalculator: React.FC<RoomCalculatorProps> = ({
           </>
         )}
       </div>
+      {data.loanType === 'arm' && (
+        <div className="mt-5">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">After Refinance at {data.refiRate}%</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <KpiCard label="Loan Amount" value={metrics.loan} />
+            <KpiCard label="Cash to Close" value={refiFinalMovedOut.cashIn} />
+            <KpiCard label="PITI / mo" value={refiFinalMovedOut.piti} />
+            <KpiCard label="Opex / mo" value={ownerOccupiedUnit ? money(refiFinalLivingIn.opex) : refiFinalMovedOut.opex} />
+            {ownerOccupiedUnit ? (
+              <>
+                <KpiCard label="Cash Flow / mo">
+                  <div className="flex justify-around items-center text-base">
+                    <div className="text-center w-1/2">
+                      <span className={refiFinalLivingIn.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>{money(refiFinalLivingIn.cashFlow)}</span>
+                      <span className="block text-xs font-normal text-slate-500">Living In</span>
+                    </div>
+                    <div className="border-l border-slate-300 h-6"></div>
+                    <div className="text-center w-1/2">
+                      <span className={refiFinalMovedOut.cashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>{money(refiFinalMovedOut.cashFlow)}</span>
+                      <span className="block text-xs font-normal text-slate-500">Moved Out</span>
+                    </div>
+                  </div>
+                </KpiCard>
+                <KpiCard label="Cash-on-Cash">
+                  <div className="flex justify-around items-center text-base">
+                    <div className="text-center w-1/2">
+                      <span className={refiFinalLivingIn.coc >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(refiFinalLivingIn.coc) ? `${refiFinalLivingIn.coc.toFixed(1)}%` : 'N/A'}</span>
+                      <span className="block text-xs font-normal text-slate-500">Living In</span>
+                    </div>
+                    <div className="border-l border-slate-300 h-6"></div>
+                    <div className="text-center w-1/2">
+                      <span className={refiFinalMovedOut.coc >= 0 ? 'text-green-600' : 'text-red-600'}>{isFinite(refiFinalMovedOut.coc) ? `${refiFinalMovedOut.coc.toFixed(1)}%` : 'N/A'}</span>
+                      <span className="block text-xs font-normal text-slate-500">Moved Out</span>
+                    </div>
+                  </div>
+                </KpiCard>
+              </>
+            ) : (
+              <>
+                <KpiCard label="Cash Flow / mo" value={refiFinalMovedOut.cashFlow} isPositive={refiFinalMovedOut.cashFlow > 0} isNegative={refiFinalMovedOut.cashFlow < 0} />
+                <KpiCard label="Cash-on-Cash" value={`${isFinite(refiFinalMovedOut.coc) ? refiFinalMovedOut.coc.toFixed(1) + '%' : 'N/A'}`} />
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <p className="text-xs text-slate-500 mt-2">Cash to Close and payment outputs include Seller Credit adjustments. PM/Maint/CapEx are % of total rent. Rider values are included when enabled.</p>
     </div>
   );

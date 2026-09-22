@@ -4,16 +4,20 @@ import React, { useMemo, useState } from 'react';
 import InputField from './InputField';
 import KpiCard from './KpiCard';
 import SellerCreditModule from './SellerCreditModule';
+import LoanTypeSelector from './LoanTypeSelector';
+import PayoffAnalysis from './PayoffAnalysis';
 import { pmt, money } from '../utils/calculators';
 import {
-    defaultSellerCreditState,
     getSellerCreditResult
 } from '../utils/sellerCredit';
 import type { BuildData, BuildUnitData, PropertyType, LandAcquisition, UnitStrategy, CalculatorType } from '../App';
+import type { SellerCreditState } from '../utils/sellerCredit';
 
 interface BuildCalculatorProps {
     data: BuildData;
     units: BuildUnitData[];
+    sellerCredit: SellerCreditState;
+    onSellerCreditChange: (next: SellerCreditState) => void;
     onDataChange: (field: keyof BuildData, value: string | number) => void;
     onPropTypeChange: (type: PropertyType) => void;
     onUnitChange: (id: string, field: keyof BuildUnitData, value: string | number) => void;
@@ -22,6 +26,8 @@ interface BuildCalculatorProps {
     onApplyAllChange: (checked: boolean) => void;
     onPushData: (source: CalculatorType, destination: CalculatorType) => void;
     onExportPdf: (elementId: string, filename: string, actionsClass: string) => void;
+    showSaveButton: boolean;
+    onSave: () => void;
 }
 
 const SectionHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -90,9 +96,8 @@ const calculatorNames: Record<CalculatorType, string> = {
     ltr: 'LTR', room: 'By-the-Room', str: 'STR', multi: 'Multi-Unit', build: 'New Build', dscr: 'DSCR Loan',
 };
 
-const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataChange, onPropTypeChange, onUnitChange, onUnitCheckboxChange, onUnitStrategyChange, onApplyAllChange, onPushData, onExportPdf }) => {
+const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, sellerCredit, onSellerCreditChange, onDataChange, onPropTypeChange, onUnitChange, onUnitCheckboxChange, onUnitStrategyChange, onApplyAllChange, onPushData, onExportPdf, showSaveButton, onSave }) => {
     const [isPushMenuOpen, setIsPushMenuOpen] = useState(false);
-    const [sellerCredit, setSellerCredit] = useState(defaultSellerCreditState);
 
     const buildCore = useMemo(() => {
         let loanableCostBase = data.hardCosts + data.softCosts + data.buffer;
@@ -132,8 +137,11 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
         const netCashInvested = upfrontCashForConstruction - cashOutAtRefi;
 
         const effectiveRefiRate = sellerCreditResult.estimatedNewRate;
+        const taxesAndInsurance = data.total_taxYr / 12 + data.total_insYr / 12;
         const pi = pmt(permanentLoanAmt, effectiveRefiRate, data.refi_term);
-        const piti = pi + data.total_taxYr / 12 + data.total_insYr / 12;
+        const piti = pi + taxesAndInsurance;
+        const armRefiPi = pmt(permanentLoanAmt, data.refiRate, data.refi_term);
+        const armRefiPiti = armRefiPi + taxesAndInsurance;
 
         const { totalRevenue, totalUnitOpex } = units.reduce((acc, unit) => {
             let revenue = 0;
@@ -157,7 +165,9 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
         const totalOpex = totalUnitOpex + propertyLevelOpex;
 
         const stabilizedCf = totalRevenue - piti - totalOpex;
+        const armRefiCf = totalRevenue - armRefiPiti - totalOpex;
         const coc = netCashInvested > 0 ? (stabilizedCf * 12) / netCashInvested * 100 : (stabilizedCf > 0 ? Infinity : -Infinity);
+        const armRefiCoc = netCashInvested > 0 ? (armRefiCf * 12) / netCashInvested * 100 : (armRefiCf > 0 ? Infinity : -Infinity);
         const returnOnCost = totalProjectCost > 0 ? (stabilizedCf * 12) / totalProjectCost * 100 : 0;
 
         let ltcInfoText = '';
@@ -168,7 +178,7 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
         }
         ltcInfoText += ` = ${money(constructionLoanAmt)}`;
 
-        return { totalProjectCost, constructionLoanAmt, constructionPayment, upfrontCashForConstruction, permanentLoanAmt, cashOutAtRefi, netCashInvested, pi, piti, totalRevenue, totalOpex, stabilizedCf, coc, returnOnCost, ltcInfoText, effectiveRefiRate };
+        return { totalProjectCost, constructionLoanAmt, constructionPayment, upfrontCashForConstruction, permanentLoanAmt, cashOutAtRefi, netCashInvested, pi, piti, totalRevenue, totalOpex, stabilizedCf, coc, returnOnCost, ltcInfoText, effectiveRefiRate, taxesAndInsurance, armRefiPiti, armRefiCf, armRefiCoc };
     }, [data, units, buildCore, sellerCreditResult]);
     
     const maintMonthly = (metrics.totalRevenue * data.maintPct) / 100;
@@ -196,6 +206,14 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 <button onClick={() => onExportPdf(CALCULATOR_ID, 'NewBuild_Analysis', ACTIONS_CLASS)} className="py-2 px-4 rounded-full font-bold bg-slate-800 text-white hover:bg-slate-700 transition-colors duration-200 text-sm">
                     Export PDF
                 </button>
+                {showSaveButton && (
+                    <button
+                        onClick={onSave}
+                        className="py-2 px-4 rounded-full font-bold bg-emerald-700 text-white hover:bg-emerald-600 transition-colors duration-200 text-sm"
+                    >
+                        Save
+                    </button>
+                )}
             </div>
 
             <SectionHeader>Project Setup</SectionHeader>
@@ -221,6 +239,8 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 </div>
             </div>
 
+            <SellerCreditModule idPrefix="build" state={sellerCredit} result={sellerCreditResult} onChange={onSellerCreditChange} />
+
             <SectionHeader>Costs & Construction Financing</SectionHeader>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {data.landAcquisition !== 'owned' && <InputField label="Land Cost ($)" id="build_land" value={data.landCost} onChange={e => onDataChange('landCost', e.target.value)} min={0} max={500000} step={5000} />}
@@ -229,21 +249,28 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 <InputField label="Buffer / Contingency ($)" id="build_buffer" value={data.buffer} onChange={e => onDataChange('buffer', e.target.value)} min={0} max={250000} step={2500} />
                 <InputField label="Estimated Closing Costs ($)" id="build_closing_costs" value={data.closingCosts} onChange={e => onDataChange('closingCosts', e.target.value)} min={0} max={100000} step={500} />
                 <InputField label="Construction Loan LTC (%)" id="build_ltc" value={data.construction_ltc} onChange={e => onDataChange('construction_ltc', e.target.value)} min={50} max={90} step={1} infoText={metrics.ltcInfoText} />
-                <InputField label="Construction Rate (%)" id="build_loan_rate" value={data.construction_rate} onChange={e => onDataChange('construction_rate', e.target.value)} min={5} max={15} step={0.1} />
+                <InputField label="Construction Rate (%)" id="build_loan_rate" value={data.construction_rate} onChange={e => onDataChange('construction_rate', e.target.value)} min={5} max={15} step={0.001} decimalPlaces={3} />
                 <InputField label="Construction Term (months)" id="build_loan_term" value={data.construction_term} onChange={e => onDataChange('construction_term', e.target.value)} min={6} max={24} step={1} />
                  <div className="col-span-1 md:col-span-2 text-sm text-slate-600 text-right -mt-2">
                     <span className="font-bold">Est. Construction Financing Payment:</span> {money(metrics.constructionPayment)}/mo (Interest Only)
                 </div>
             </div>
 
-            <SellerCreditModule idPrefix="build" state={sellerCredit} result={sellerCreditResult} onChange={setSellerCredit} />
-
             <SectionHeader>Permanent Financing (Refinance)</SectionHeader>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <InputField label="After Repair Value (ARV)" id="build_arv" value={data.arv} onChange={e => onDataChange('arv', e.target.value)} min={0} max={3000000} step={10000} />
                  <InputField label="Refinance LTV (%)" id="build_ltv" value={data.refi_ltv} onChange={e => onDataChange('refi_ltv', e.target.value)} min={50} max={80} step={1} infoText={`Permanent Loan Amount = ${money(metrics.permanentLoanAmt)}`} />
-                 <InputField label="Refinance Rate (%)" id="build_refi_rate" value={data.refi_rate} onChange={e => onDataChange('refi_rate', e.target.value)} min={4} max={12} step={0.05} />
+                 <InputField label="Refinance Rate (%)" id="build_refi_rate" value={data.refi_rate} onChange={e => onDataChange('refi_rate', e.target.value)} min={4} max={12} step={0.001} decimalPlaces={3} />
                  <InputField label="Refinance Term (years)" id="build_refi_term" value={data.refi_term} onChange={e => onDataChange('refi_term', e.target.value)} min={15} max={30} step={1} />
+                 <LoanTypeSelector
+                    idPrefix="build"
+                    loanType={data.loanType}
+                    armType={data.armType}
+                    refiRate={data.refiRate}
+                    onLoanTypeChange={value => onDataChange('loanType', value)}
+                    onArmTypeChange={value => onDataChange('armType', value)}
+                    onRefiRateChange={value => onDataChange('refiRate', value)}
+                 />
                 <div className="col-span-1 md:col-span-2 text-sm text-slate-600 text-right -mt-2">
                     <span className="font-bold">Permanent Financing P&I:</span> {money(metrics.pi)}/mo
                 </div>
@@ -268,8 +295,19 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                     <UnitCard key={unit.id} unit={unit} index={index} onChange={onUnitChange} onCheckboxChange={onUnitCheckboxChange} onStrategyChange={onUnitStrategyChange} isFirst={units.length > 1 && index === 0} applyToAll={data.applyToAll} onApplyAllChange={onApplyAllChange} />
                 ))}
             </div>
+            <PayoffAnalysis
+                enabled={data.payoffEnabled}
+                onToggle={checked => onDataChange('payoffEnabled', checked)}
+                monthlyRevenue={metrics.totalRevenue}
+                monthlyTaxesAndInsurance={metrics.taxesAndInsurance}
+                monthlyOpex={metrics.totalOpex}
+                note="Shows stabilized paid-off cash flow after construction, keeping taxes, insurance, and operating expenses included."
+            />
             
             <hr className="my-6" />
+            {data.loanType === 'arm' && (
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Initial ARM Period ({data.armType})</h3>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <KpiCard label="Total Project Cost" value={metrics.totalProjectCost} />
                 <KpiCard label="Upfront Cash for Construction" value={metrics.upfrontCashForConstruction} />
@@ -281,7 +319,23 @@ const BuildCalculator: React.FC<BuildCalculatorProps> = ({ data, units, onDataCh
                 <KpiCard label="Stabilized CF / mo" value={metrics.stabilizedCf} isPositive={metrics.stabilizedCf > 0} isNegative={metrics.stabilizedCf < 0} />
                 <KpiCard label="Cash-on-Cash Return" value={`${isFinite(metrics.coc) ? metrics.coc.toFixed(1) + '%' : '—'}`} />
             </div>
-             <p className="text-xs text-slate-500 mt-2">All calculations are based on the stabilized property after refinancing into permanent debt. Seller Credit updates closing costs, adjusted cash to close, and estimated refinance rate.</p>
+            {data.loanType === 'arm' && (
+                <div className="mt-5">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">After Refinance at {data.refiRate}%</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <KpiCard label="Total Project Cost" value={metrics.totalProjectCost} />
+                        <KpiCard label="Upfront Cash for Construction" value={metrics.upfrontCashForConstruction} />
+                        <KpiCard label="Cash Out/(In) at Refi" value={metrics.cashOutAtRefi} isPositive={metrics.cashOutAtRefi > 0} isNegative={metrics.cashOutAtRefi < 0} />
+                        <KpiCard label="Net Cash Invested" value={metrics.netCashInvested} />
+                        <KpiCard label="Total Revenue / mo" value={metrics.totalRevenue} />
+                        <KpiCard label="Total Opex / mo" value={metrics.totalOpex} />
+                        <KpiCard label="PITI / mo" value={metrics.armRefiPiti} />
+                        <KpiCard label="Stabilized CF / mo" value={metrics.armRefiCf} isPositive={metrics.armRefiCf > 0} isNegative={metrics.armRefiCf < 0} />
+                        <KpiCard label="Cash-on-Cash Return" value={`${isFinite(metrics.armRefiCoc) ? metrics.armRefiCoc.toFixed(1) + '%' : '—'}`} />
+                    </div>
+                </div>
+            )}
+             <p className="text-xs text-slate-500 mt-2">All calculations are based on the stabilized property after refinancing into permanent debt. Seller Credit updates closing costs and adjusted cash to close.</p>
         </div>
     );
 };

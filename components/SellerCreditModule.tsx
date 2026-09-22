@@ -1,6 +1,6 @@
 import React from 'react';
 import InputField from './InputField';
-import { money, num } from '../utils/calculators';
+import { money, num, round2 } from '../utils/calculators';
 import type { SellerCreditResult, SellerCreditState } from '../utils/sellerCredit';
 
 interface SellerCreditModuleProps {
@@ -16,7 +16,7 @@ const SellerCreditModule: React.FC<SellerCreditModuleProps> = ({ idPrefix, state
   const updateNumber = (field: 'amount' | 'creditToClosing' | 'creditToBuydown') => (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    onChange({ ...state, [field]: num(event.target.value) });
+    onChange({ ...state, [field]: round2(num(event.target.value)) });
   };
 
   const updateToggle = (field: 'enabled' | 'applyToClosingCosts' | 'applyToRateBuydown') => (
@@ -36,7 +36,7 @@ const SellerCreditModule: React.FC<SellerCreditModuleProps> = ({ idPrefix, state
   };
 
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4" data-seller-credit-module="true" data-enabled={state.enabled ? 'true' : 'false'}>
       <h3 className="font-bold text-md mb-2">Seller Credit</h3>
       <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none">
         <input
