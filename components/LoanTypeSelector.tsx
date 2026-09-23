@@ -34,7 +34,7 @@ const LoanTypeSelector: React.FC<LoanTypeSelectorProps> = ({
           onChange={() => onLoanTypeChange('fixed')}
           className="form-radio h-4 w-4 text-slate-600"
         />
-        30-Year Fixed
+        Fixed
       </label>
       <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer select-none">
         <input
