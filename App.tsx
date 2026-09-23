@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import Header from './components/Header';
 import InvestorLeadGate from './components/InvestorLeadGate';
+import CalculatorHelpWidget from './components/CalculatorHelpWidget';
 import Footer from './components/Footer';
 import LtrCalculator from './components/LtrCalculator';
 import RoomCalculator from './components/RoomCalculator';
@@ -916,6 +917,7 @@ const App: React.FC = () => {
                 </aside>
             </div>
             <Footer />
+            <CalculatorHelpWidget activeTab={activeTab as CalculatorType} />
             </div>
             <InvestorLeadGate />
         </div>
