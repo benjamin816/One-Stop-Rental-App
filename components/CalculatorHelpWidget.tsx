@@ -7,53 +7,69 @@ type Mode = 'menu' | 'guide' | 'message';
 type LeadResult = { type: 'investor-lead-result'; ok: boolean; submissionId: string; notified?: boolean };
 type HelpItem = { question: string; answer: string };
 
+const renovationAnswer = 'For a relatively move-in-ready home, you might spend less than $5,000. Cosmetic updates often run around $10,000–$15,000. If you also need a major item such as a roof or HVAC, plan closer to $20,000–$25,000. These are rough planning ranges; get property-specific bids.';
+const capexVsMaintenance: HelpItem = {
+  question: 'What’s the difference between CapEx and maintenance?',
+  answer: 'Maintenance covers everyday repairs, like a handyman fixing a leaking sink. CapEx is money set aside for planned replacement of big items such as the roof, HVAC, or water heater.',
+};
+
 const help: Record<CalculatorType, { title: string; items: HelpItem[] }> = {
   ltr: {
     title: 'Long / Medium-Term Rental',
     items: [
-      { question: 'What does cash flow mean here?', answer: 'It is estimated monthly rent minus the mortgage payment and the operating costs entered above. Use it as a screening estimate, not a guarantee.' },
-      { question: 'Why is cash to close different from my down payment?', answer: 'Cash to close also includes closing costs and any upfront renovation costs, and accounts for an enabled seller credit.' },
-      { question: 'What should I include in expenses?', answer: 'Add realistic taxes, insurance, HOA, utilities, management, maintenance and future capital repairs. Compare the results with actual quotes before making a decision.' },
+      { question: 'What’s a typical down payment?', answer: 'Most investment loans require 20–25% down. In our Raleigh market, most of our long-term-rental investors put down 30–50% or more to make the property cash flow.' },
+      { question: 'Do I need a property manager?', answer: 'I’ve seen investors go both ways. Most out-of-state long-term-rental investors I work with self-manage for at least the first few years to help the numbers, then eventually hire property management.' },
+      { question: 'What’s a typical renovation cost?', answer: renovationAnswer },
+      capexVsMaintenance,
     ],
   },
   room: {
     title: 'By-the-Room / House Hack',
     items: [
-      { question: 'How do I model an owner-occupied room?', answer: 'Mark the space you will occupy as owner-occupied and enter rent for the spaces you expect to lease. This helps separate your own space from potential rental income.' },
-      { question: 'Can I add an ADU or another unit?', answer: 'Yes. Add a room, ADU or unit and set its expected monthly rent. Check local rules and permitting before relying on that income.' },
-      { question: 'What is a house hack?', answer: 'It is living in part of a property while renting other space. The calculator helps compare that rental income with the property’s ongoing costs.' },
+      { question: 'What’s a typical down payment?', answer: 'Most investment loans require 20–25% down. With a by-the-room strategy, 25–30% down may be enough to produce cash flow, depending on the property, financing, and room rents.' },
+      { question: 'Do I need a property manager?', answer: 'Most by-the-room operators are local. This is not a strategy for the faint of heart from out of state, and it can be tough to find a property manager for individual-room rentals.' },
+      { question: 'What’s a typical renovation cost?', answer: renovationAnswer },
+      capexVsMaintenance,
+      { question: 'Tell me more about this strategy.', answer: 'Renting individual rooms can create more income from a single-family home that might not work as a traditional long-term rental. We’ve also experimented with short-term stays in individual rooms, but most investors use longer-term room leases. Check local rules and the extra management work before relying on the numbers.' },
+      { question: 'Who rents by the room?', answer: 'Traveling professionals, traveling nurses, college students, and people in their 20s are common renters for this strategy.' },
+      { question: 'What’s house hacking?', answer: 'House hacking means living in part of a property while renting out other rooms or units to help offset your housing costs. In this calculator, mark the space you’ll occupy as owner-occupied and enter expected rent for the other spaces.' },
     ],
   },
   str: {
     title: 'Short-Term Rental',
     items: [
-      { question: 'What are ADR and occupancy?', answer: 'ADR is the average nightly rate. Occupancy is the share of nights you expect to book. Together, they drive estimated gross booking revenue.' },
-      { question: 'Why enter cleaning and platform fees?', answer: 'Short-term rentals have turnover and booking costs that can materially reduce take-home income. Include co-hosting, supplies and utilities too.' },
-      { question: 'Should I use peak-season numbers?', answer: 'Use a realistic annual average and try a lower-occupancy scenario. Confirm local short-term rental rules and actual comparable listings.' },
+      { question: 'What’s a typical down payment?', answer: 'Most investment loans require 20–25% down. In our experience, that can often be enough for a short-term rental to cash flow a little, depending on the rate, occupancy, and operating costs.' },
+      { question: 'Do I need a property manager?', answer: 'I’ve seen investors go both ways, but most out-of-state operators use a local co-host for the day-to-day work. Managing a short-term rental from a distance is possible, but it’s hard.' },
+      { question: 'What’s a typical renovation cost?', answer: renovationAnswer },
+      capexVsMaintenance,
+      { question: 'What are some of the best areas for a short-term rental in Raleigh?', answer: 'This deserves a property-specific conversation with our team. We often favor North and Northwest Raleigh, Cary, and areas near the airport on the Durham side. Location, local rules, and the exact property all matter.' },
+      { question: 'Who rents a short-term rental in Raleigh?', answer: 'Guests include traveling professionals and nurses, people visiting students at local colleges, and visitors here for Lenovo Center events, the State Fair, games, concerts, weddings, and other trips.' },
     ],
   },
   multi: {
     title: 'Multi-Unit',
     items: [
-      { question: 'How do I enter each unit?', answer: 'Add a unit for each rentable space and enter its estimated monthly rent. The calculator combines their income for the property-level analysis.' },
-      { question: 'What happens when one unit is vacant?', answer: 'Lower that unit’s rent to zero, or reduce the total expected rent, to see a conservative scenario. A vacancy reserve is wise even when every unit is currently leased.' },
-      { question: 'Are the costs per unit or for the whole building?', answer: 'Purchase, loan, tax, insurance and most operating inputs are for the overall property. Verify shared utilities and maintenance carefully.' },
+      { question: 'What’s a typical down payment?', answer: 'Most multi-unit investment loans require about 20–25% down. Your lender, property, and loan program determine the actual requirement.' },
+      { question: 'Do I need a property manager?', answer: 'Yes, most investors I work with hire property management for a multi-unit property, although I’ve seen investors go both ways.' },
+      { question: 'What’s a typical renovation cost?', answer: 'As rough per-unit planning ranges: a relatively move-in-ready unit might need less than $5,000 per unit; cosmetic work often runs $10,000–$15,000 per unit; and work involving major items along with cosmetics can run $20,000–$25,000 per unit. Get bids for the specific building.' },
+      capexVsMaintenance,
+      { question: 'Is Raleigh a good market for multifamily?', answer: 'Raleigh is competitive and not necessarily the easiest market for multifamily. Good deals exist, but they can be few and far between, and desirable properties can be pricey. Investors may need more cash down, larger renovations, or a creative strategy—such as short-term rental in one or two units—to make the numbers work, subject to local rules.' },
     ],
   },
   build: {
     title: 'New Build',
     items: [
-      { question: 'What goes into total project cost?', answer: 'Include land, hard construction costs, soft costs, a contingency buffer and closing costs. Estimates can change, so confirm them with your builder and lender.' },
-      { question: 'What are ARV and refinance LTV?', answer: 'ARV is your estimated value after construction. Refinance LTV is the loan share of that value. These assumptions affect the modeled permanent loan.' },
-      { question: 'Can units use different rental strategies?', answer: 'Yes. Set each unit to long-term or short-term rental and enter the relevant income and costs before comparing the completed project.' },
+      capexVsMaintenance,
     ],
   },
   dscr: {
     title: 'DSCR Loan',
     items: [
-      { question: 'What does DSCR measure?', answer: 'Debt-service coverage compares estimated property income with the loan payment. Lenders calculate it differently, so check the specific lender’s rules.' },
-      { question: 'Why use a stress test?', answer: 'A higher rate or lower income scenario helps show how much room the deal has if conditions change.' },
-      { question: 'Can I compare long- and short-term rental income?', answer: 'Yes. Choose the property income type in the DSCR tab and enter the corresponding rent or nightly-rate assumptions.' },
+      { question: 'What’s a typical down payment?', answer: 'Most DSCR loans require about 20–25% down, but your rental strategy, the property’s income, and the lender’s rules play a big part in how much you need to put down to cash flow.' },
+      { question: 'What’s a typical renovation cost?', answer: renovationAnswer },
+      capexVsMaintenance,
+      { question: 'How do DSCR rates compare with typical investment loans?', answer: 'There is no dependable fixed percentage-point premium. DSCR rates can be comparable to conventional investment-property rates, although some quotes are higher. Compare live quotes with the same down payment, points, loan term, and prepayment terms.' },
+      { question: 'Can I use a DSCR loan for a short-term rental?', answer: 'It depends on the lender and loan program. We work with a trusted lender who can finance short-term rentals with DSCR loans, and I’ve personally used this strategy to buy Raleigh investment property.' },
     ],
   },
 };
