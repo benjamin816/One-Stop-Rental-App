@@ -7,7 +7,7 @@ const Footer: React.FC = () => {
                 <div className="mb-7 rounded-xl border border-[#E9CC77]/40 bg-white/10 px-5 py-6">
                     <p className="text-lg font-bold text-white">Want to explore Raleigh investment opportunities together?</p>
                     <p className="mb-4 mt-1 text-sm text-slate-200">Bring your questions and your calculator results to a one-on-one call.</p>
-                    <a href="/invest/" className="inline-block rounded-lg bg-[#D8B13A] px-5 py-3 font-bold text-[#203422] transition hover:bg-[#E9C65A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Book your one-on-one exploration call</a>
+                    <a href="/invest/" className="inline-block rounded-lg border border-[#E9C65A] bg-[#94700E] px-5 py-3 font-bold text-white transition hover:bg-[#7D5D0F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Book your one-on-one exploration call</a>
                 </div>
                 <p className="font-semibold text-lg mb-2">Benjamin Carver</p>
                 <p className="text-sm mb-2">Raleigh-Durham NC Realtor & Investor</p>
