@@ -11,7 +11,7 @@
 
 .calculator-hero__photo {
     position: absolute;
-    z-index: -3;
+    z-index: 0;
     inset: 0 0 0 40%;
     background: url('/raleigh-skyline.jpg') center 39% / cover no-repeat;
     opacity: .4;
@@ -22,7 +22,7 @@
 
 .calculator-hero__glow {
     position: absolute;
-    z-index: -2;
+    z-index: 1;
     inset: 0;
     background: radial-gradient(ellipse at 79% 31%, rgba(236, 197, 80, .3), transparent 25%),
         linear-gradient(90deg, rgba(0, 43, 33, .12) 42%, rgba(0, 50, 38, .42));
@@ -31,7 +31,7 @@
 .calculator-hero::after {
     content: '';
     position: absolute;
-    z-index: -1;
+    z-index: 2;
     left: -4%;
     bottom: -165px;
     width: 108%;
@@ -44,6 +44,7 @@
 
 .calculator-hero__inner {
     position: relative;
+    z-index: 3;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
