@@ -65,7 +65,13 @@ function doPost(e) {
       '',
       isMessage ? 'Message' : 'Lead capture',
       calculatorTab,
-      message
+      message,
+      lead.newsletterOptIn === true ? 'Yes' : 'No',
+      lead.newsletterOptIn === true ? new Date() : '',
+      'Pending',
+      '',
+      '',
+      ''
     ];
     sheet.appendRow(values);
     const row = sheet.getLastRow();

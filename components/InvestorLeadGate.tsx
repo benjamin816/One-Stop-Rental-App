@@ -21,6 +21,7 @@ const InvestorLeadGate: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [wantsContact, setWantsContact] = useState(false);
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
   const [consent, setConsent] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const pendingId = useRef('');
@@ -87,6 +88,7 @@ const InvestorLeadGate: React.FC = () => {
       investingGoal: String(data.get('investingGoal') || '').trim(),
       propertyType: String(data.get('propertyType') || '').trim(),
       wantsContact,
+      newsletterOptIn,
       contactConsent: consent,
       website: String(data.get('website') || ''),
       pageUrl: window.location.href,
@@ -138,6 +140,7 @@ const InvestorLeadGate: React.FC = () => {
             <label className="block text-sm font-semibold text-[#2F5233]">Property type <select name="propertyType" className={`${fieldClass} mt-1`} defaultValue=""><option value="">Select one (optional)</option><option>Single-family</option><option>Multi-unit</option><option>Short-term rental</option><option>New construction</option><option>Other</option></select></label>
           </div>
           <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={wantsContact} onChange={e => setWantsContact(e.target.checked)} className="mt-1 h-4 w-4 accent-[#D8B13A]" /><span>Yes, I would like to be contacted about investing in Raleigh, NC.</span></label>
+          <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-700"><input type="checkbox" checked={newsletterOptIn} onChange={e => setNewsletterOptIn(e.target.checked)} className="mt-1 h-4 w-4 accent-[#D8B13A]" /><span>Send me the monthly Raleigh investor newsletter with investment videos, market insights, and new resources. I can unsubscribe anytime.</span></label>
           <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-slate-600"><input type="checkbox" required checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 h-4 w-4 accent-[#D8B13A]" /><span>I agree to the collection of my details for this calculator and to receive a response about my request. Review the <a href="https://www.raleighncguide.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.</span></label>
           <div className="absolute left-[-10000px]" aria-hidden="true"><label>Website<input name="website" tabIndex={-1} autoComplete="off" /></label></div>
           {error && <p role="alert" className="text-sm font-semibold text-red-700">{error}</p>}
