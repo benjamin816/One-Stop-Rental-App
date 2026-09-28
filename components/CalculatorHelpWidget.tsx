@@ -100,6 +100,7 @@ const CalculatorHelpWidget: React.FC<{ activeTab: CalculatorType }> = ({ activeT
         return;
       }
       setError('');
+      window.dispatchEvent(new Event('raleigh-investor-lead-saved'));
       setStatus(event.data.notified === false
         ? 'Your message was saved, but the email alert did not send. Please call or email Benjamin if it is urgent.'
         : 'Thanks! Your message was sent to Benjamin.');

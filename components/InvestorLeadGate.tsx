@@ -40,6 +40,7 @@ const InvestorLeadGate: React.FC = () => {
         return;
       }
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ timestamp: new Date().toISOString() })); } catch { /* Private browsing may block storage. */ }
+      window.dispatchEvent(new Event('raleigh-investor-lead-saved'));
       setUnlocked(true);
     };
     window.addEventListener('message', onMessage);
